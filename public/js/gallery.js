@@ -257,9 +257,29 @@ class Timeline {
     }
 
     async fetchImageGroups() {
-        const response = await fetch('/api/images');
-        this.imageGroups = await response.json();
-        this.imageGroups.sort((a, b) => new Date(a.centerDate) - new Date(b.centerDate));
+        try {
+            const response = await fetch('/data/images.json');
+            if (!response.ok) {
+                throw new Error('Failed to fetch image groups');
+            }
+            const data = await response.json();
+            // Convert date strings back to moment objects
+            this.imageGroups = data.map(group => ({
+                ...group,
+                startDate: moment(group.startDate),
+                endDate: moment(group.endDate),
+                centerDate: moment(group.centerDate),
+                images: group.images.map(img => ({
+                    ...img,
+                    date: moment(img.date)
+                }))
+            }));
+            // Sort by center date
+            this.imageGroups.sort((a, b) => a.centerDate.valueOf() - b.centerDate.valueOf());
+        } catch (error) {
+            console.error('Error fetching image groups:', error);
+            this.imageGroups = [];
+        }
     }
 
     createTimelineSVG() {
