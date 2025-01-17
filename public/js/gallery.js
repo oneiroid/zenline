@@ -2,6 +2,8 @@
 const TRANSITION_DURATION = 2000;
 const MIN_ROTATION_DELAY = 3000;
 const MAX_ADDITIONAL_DELAY = 4000;
+const PREVIEW_GRID_SIZE = 3; // Number of thumbnails in preview grid (3x3)
+const PREVIEW_THUMBNAIL_SIZE = 100; // Size of each preview thumbnail
 
 class TimelineGroup {
     constructor(data, index, position, container) {
@@ -11,6 +13,7 @@ class TimelineGroup {
         this.container = container;
         this.currentImage = null;
         this.rotationInterval = null;
+        this.previewThumbnails = [];
         this.initialize();
     }
 
@@ -39,8 +42,15 @@ class TimelineGroup {
             .attr('text-anchor', 'middle')
             .text(`${this.data.dateRange} (${this.data.images.length})`);
 
+        // Initialize preview grid container
+        this.previewContainer = this.group.append('g')
+            .attr('class', 'preview-container')
+            .style('opacity', 0)
+            .attr('pointer-events', 'none');
+
         // Initialize thumbnail system
         this.initializeThumbnail();
+        this.initializePreviewGrid();
         this.startRotation();
 
         // Add hover and click handlers
@@ -121,17 +131,102 @@ class TimelineGroup {
         }
     }
 
+    initializePreviewGrid() {
+        const gridSize = Math.min(PREVIEW_GRID_SIZE, Math.ceil(Math.sqrt(this.data.images.length)));
+        const totalWidth = gridSize * PREVIEW_THUMBNAIL_SIZE;
+        const startX = -totalWidth / 2;
+        const startY = -this.position.radius - totalWidth - 20;
+
+        this.previewContainer.append('rect')
+            .attr('width', totalWidth)
+            .attr('height', totalWidth)
+            .attr('transform', `translate(${startX},${startY})`)
+            .style('fill', '#ddd');
+
+        // Create clip paths for preview thumbnails
+        const previewClipPath = this.group.append('defs')
+            .append('clipPath')
+            .attr('id', `preview-clip-${this.index}`)
+            .append('rect')
+            .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
+            .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
+            .attr('rx', 4);
+
+        // Select random images for preview
+        const previewImages = this.getRandomPreviewImages(gridSize * gridSize);
+
+        previewImages.forEach((img, i) => {
+            const row = Math.floor(i / gridSize);
+            const col = i % gridSize;
+            const x = startX + col * PREVIEW_THUMBNAIL_SIZE;
+            const y = startY + row * PREVIEW_THUMBNAIL_SIZE;
+
+            const previewGroup = this.previewContainer.append('g')
+                .attr('transform', `translate(${x},${y})`);
+
+            // Add background for thumbnail
+            previewGroup.append('rect')
+                .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
+                .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
+                .attr('rx', 4)
+                .style('fill', '#fff')
+                .style('stroke', '#ddd')
+                .style('stroke-width', '1px');
+
+            // Add image
+            const thumbnail = previewGroup.append('image')
+                .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
+                .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
+                .attr('clip-path', `url(#preview-clip-${this.index})`)
+                .attr('preserveAspectRatio', 'xMidYMid slice')
+                .attr('xlink:href', `/imgs/${img.filename}`);
+
+            this.previewThumbnails.push(thumbnail);
+        });
+    }
+
+    getRandomPreviewImages(count) {
+        const images = [...this.data.images];
+        const result = [];
+        count = Math.min(count, images.length);
+        
+        for (let i = 0; i < count; i++) {
+            const randomIndex = Math.floor(Math.random() * images.length);
+            result.push(images.splice(randomIndex, 1)[0]);
+        }
+        
+        return result;
+    }
+
     onHover(isHovered) {
+        if (isHovered) {
+            this.group.raise(); // Move group to the top of the rendering stack
+        }
+
         // Scale transition
         this.scaleGroup.transition()
             .duration(300)
-            .attr('transform', isHovered ? 'scale(1.3)' : 'scale(1)');
+            .attr('transform', isHovered ? 'scale(1.1)' : 'scale(1)');
+
+        // Preview grid transition
+        this.previewContainer.transition()
+            .duration(300)
+            .style('opacity', isHovered ? 1 : 0);
+
+        //this.previewContainer.style('z-index', isHovered ? 1000 : 10);
 
         // Style changes
         this.group.select('.timeline-group-background')
             .transition()
             .duration(300)
             .style('stroke-width', isHovered ? '5px' : '3px');
+
+        // Stop/start rotation on hover
+        if (isHovered) {
+            this.stopRotation();
+        } else {
+            this.startRotation();
+        }
     }
 
     onClick() {
