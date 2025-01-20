@@ -8,15 +8,21 @@ function scanImages() {
     const MIN_GROUP_SIZE = 7;
     const MAX_MONTHS_DISTANCE = 3;
 
-    const images = fs.readdirSync(imgDir)
+    // First scan for images and their associated GLB files
+    const files = fs.readdirSync(imgDir);
+    const images = files
         .filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file))
         .map(file => {
             const [datePart] = file.split('.');
             const date = moment(datePart.slice(0, 7));
+            const baseFileName = path.parse(file).name;
+            const glbFile = files.find(f => f === `${baseFileName}.glb`);
+            
             return {
                 filename: file,
                 date,
-                month: date.format('YYYY-MM')
+                month: date.format('YYYY-MM'),
+                ...(glbFile && { glbFile })
             };
         });
 

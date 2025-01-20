@@ -5,6 +5,90 @@ const MAX_ADDITIONAL_DELAY = 4000;
 const PREVIEW_GRID_SIZE = 3; // Number of thumbnails in preview grid (3x3)
 const PREVIEW_THUMBNAIL_SIZE = 100; // Size of each preview thumbnail
 
+// Add 3D viewer class at the top of the file
+class ModelViewer {
+    constructor(container) {
+        this.container = container;
+        this.init();
+    }
+
+    init() {
+        this.scene = new THREE.Scene();
+        this.camera = new THREE.PerspectiveCamera(75, this.container.clientWidth / this.container.clientHeight, 0.1, 20);
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 5;
+        this.renderer.setClearColor(0xdddddd);
+        this.container.appendChild(this.renderer.domElement);
+
+        // Add lights
+        //const ambientLight = new THREE.AmbientLight(0xffffff, 200.5);
+        //this.scene.add(ambientLight);
+        //const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
+        //directionalLight.position.set(0, 1, 1);
+        //this.scene.add(directionalLight);
+
+
+        this.camera.position.z = 5;
+        
+        // Add orbit controls
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+
+        this.animate();
+    }
+
+    animate = () => {
+        requestAnimationFrame(this.animate);
+        this.controls.update();
+        this.renderer.render(this.scene, this.camera);
+    }
+
+    loadModel(url) {
+        const loader = new THREE.GLTFLoader();
+        loader.load(url, (gltf) => {
+            // Clear existing model if any
+            while(this.scene.children.length > 0){ 
+                this.scene.remove(this.scene.children[0]); 
+            }
+            
+            // Add new model
+            const model = gltf.scene;
+            this.scene.add(model);
+
+            // Center and scale model
+            const box = new THREE.Box3().setFromObject(model);
+            const center = box.getCenter(new THREE.Vector3());
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 2 / maxDim;
+            model.scale.multiplyScalar(scale);
+            model.position.sub(center.multiplyScalar(scale));
+
+            // Add lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            this.scene.add(ambientLight);
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight.position.set(0, 1, 1);
+            this.scene.add(directionalLight);
+        });
+    }
+
+    resize() {
+        this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    }
+
+    destroy() {
+        this.renderer.dispose();
+        this.container.removeChild(this.renderer.domElement);
+    }
+}
+
 class TimelineGroup {
     constructor(data, index, position, container) {
         this.data = data;
@@ -406,9 +490,20 @@ function showGroupView(group) {
 
     group.images.forEach(img => {
         const imgElement = document.createElement('a');
-        imgElement.href = `/imgs/${img.filename}`;
-        imgElement.setAttribute('data-lightbox', 'group');
-        imgElement.setAttribute('data-title', img.filename);
+        if (img.glbFile) {
+            // For GLB models, create a custom lightbox
+            imgElement.href = '#';
+            imgElement.setAttribute('data-glb', `/imgs/${img.glbFile}`);
+            imgElement.onclick = (e) => {
+                e.preventDefault();
+                showModelLightbox(img.glbFile);
+            };
+        } else {
+            // Regular image lightbox
+            imgElement.href = `/imgs/${img.filename}`;
+            imgElement.setAttribute('data-lightbox', 'group');
+            imgElement.setAttribute('data-title', img.filename);
+        }
 
         const image = document.createElement('img');
         image.src = `/imgs/${img.filename}`;
@@ -417,6 +512,53 @@ function showGroupView(group) {
         imgElement.appendChild(image);
         container.appendChild(imgElement);
     });
+}
+
+function showModelLightbox(glbFile) {
+    // Create lightbox container
+    const lightboxContainer = document.createElement('div');
+    lightboxContainer.className = 'model-lightbox';
+    document.body.appendChild(lightboxContainer);
+
+    // Create close button
+    const closeButton = document.createElement('button');
+    closeButton.className = 'model-lightbox-close';
+    closeButton.innerHTML = '×';
+    lightboxContainer.appendChild(closeButton);
+
+    // Create viewer container
+    const viewerContainer = document.createElement('div');
+    viewerContainer.className = 'model-viewer-container';
+    lightboxContainer.appendChild(viewerContainer);
+
+    // Initialize viewer
+    const viewer = new ModelViewer(viewerContainer);
+    viewer.loadModel(`/imgs/${glbFile}`);
+
+    // Handle close
+    closeButton.onclick = () => {
+        viewer.destroy();
+        document.body.removeChild(lightboxContainer);
+    };
+
+    // Handle resize
+    const handleResize = () => viewer.resize();
+    window.addEventListener('resize', handleResize);
+
+    // Handle escape key
+    const handleKeyup = (e) => {
+        if (e.key === 'Escape') {
+            closeButton.click();
+        }
+    };
+    window.addEventListener('keyup', handleKeyup);
+
+    // Cleanup event listeners when closing
+    const cleanup = () => {
+        window.removeEventListener('resize', handleResize);
+        window.removeEventListener('keyup', handleKeyup);
+    };
+    lightboxContainer.addEventListener('remove', cleanup);
 }
 
 function debounce(func, wait) {
