@@ -1,3 +1,9 @@
+// Import required libraries
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import moment from 'moment';
+
 // Constants
 const TRANSITION_DURATION = 2000;
 const MIN_ROTATION_DELAY = 3000;
@@ -34,7 +40,7 @@ class ModelViewer {
         this.camera.position.z = 5;
         
         // Add orbit controls
-        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
 
@@ -48,7 +54,7 @@ class ModelViewer {
     }
 
     loadModel(url) {
-        const loader = new THREE.GLTFLoader();
+        const loader = new GLTFLoader();
         loader.load(url, (gltf) => {
             // Clear existing model if any
             while(this.scene.children.length > 0){ 
@@ -581,3 +587,6 @@ document.getElementById('back-to-timeline').addEventListener('click', () => {
 
 // Initialize timeline
 const timeline = new Timeline('timeline');
+
+// Export functions and classes that need to be accessed from outside
+export { Timeline, showGroupView, showModelLightbox };
