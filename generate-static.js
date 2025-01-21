@@ -5,8 +5,8 @@ const moment = require('moment');
 // Copy the scanImages function from app.js
 function scanImages() {
     const imgDir = path.join(__dirname, 'public', 'imgs');
-    const MIN_GROUP_SIZE = 7;
-    const MAX_MONTHS_DISTANCE = 3;
+    const MIN_GROUP_SIZE = 6;
+    const MAX_MONTHS_DISTANCE = 4;
 
     // First scan for images and their associated GLB files
     const files = fs.readdirSync(imgDir);
