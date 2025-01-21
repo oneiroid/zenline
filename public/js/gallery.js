@@ -373,9 +373,9 @@ class Timeline {
     }
 
     createTimelineSVG() {
-        const margin = { top: 20, right: 40, bottom: 60, left: 40 };
+        const margin = { top: 20, right: 10, bottom: 60, left: 10 };
         const container = document.getElementById(this.containerId);
-        const minWidth = Math.max(container.clientWidth, this.imageGroups.length * 120);
+        const minWidth = Math.max(container.clientWidth, this.imageGroups.length * 60);
         const width = minWidth - margin.left - margin.right;
         const height = container.clientHeight - margin.top - margin.bottom;
 
@@ -392,7 +392,7 @@ class Timeline {
     }
 
     createScales(width, height) {
-        const timeExtent = d3.extent(this.imageGroups, d => new Date(d.centerDate));
+        const timeExtent = [new Date(this.imageGroups[0].startDate), new Date(this.imageGroups.at(-1).endDate)];
         const padding = (timeExtent[1] - timeExtent[0]) * 0.05;
 
         const xScale = d3.scaleTime()
@@ -404,7 +404,7 @@ class Timeline {
 
         const sizeScale = d3.scaleLinear()
             .domain([0, d3.max(this.imageGroups, d => d.size)])
-            .range([30, 100]);
+            .range([30, 110]);
 
         return { xScale, sizeScale };
     }

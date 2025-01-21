@@ -14,7 +14,7 @@ body {
     height: 100vh;
     margin: 0;
     padding: 20px;
-    overflow: hidden;
+    /*overflow-x: hidden;*/
 }
 
 h1 {
@@ -38,7 +38,7 @@ h1 {
     background-color: white;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 20px;
+    /*padding: 20px;*/
     overflow-x: auto;
     overflow-y: hidden;
 }
