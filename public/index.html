@@ -12,19 +12,18 @@
     <script type="importmap">
         {
           "imports": {
-            "three": "https://cdn.jsdelivr.net/npm/three@<version>/build/three.module.js",
-            "three/addons/": "https://cdn.jsdelivr.net/npm/three@<version>/examples/jsm/"
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.128.0/examples/jsm/controls/OrbitControls.js",
+            "three/addons/loaders/GLTFLoader.js": "https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
+            "moment": "https://cdn.jsdelivr.net/npm/moment@2.29.4/dist/moment.min.js"
           }
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
     <div class="container">
         <div id="timeline-view" class="view active">
-            <h1>Image Gallery Timeline</h1>
+            <h1>Zen Timeline</h1>
             <div id="timeline"></div>
         </div>
         <div id="group-view" class="view">
@@ -32,7 +31,17 @@
             <div id="group-images"></div>
         </div>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.4/moment.min.js"></script>
-    <script src="/js/gallery.js"></script>
+    <script type="module">
+        import { Timeline, showGroupView } from '/js/gallery.js';
+        
+        // Initialize timeline
+        const timeline = new Timeline('timeline');
+        
+        // Event Listeners
+        document.getElementById('back-to-timeline').addEventListener('click', () => {
+            document.getElementById('group-view').classList.remove('active');
+            document.getElementById('timeline-view').classList.add('active');
+        });
+    </script>
 </body>
 </html> 
