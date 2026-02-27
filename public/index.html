@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image Gallery</title>
+    <title>Zen Timeline</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css">
     <link rel="stylesheet" href="/css/style.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
@@ -23,25 +23,27 @@
 <body>
     <div class="container">
         <div id="timeline-view" class="view active">
-            <h1>Zen Timeline</h1>
+            <h1>Zen Timeline<span class="subtitle">a journey through art</span></h1>
             <div id="timeline"></div>
         </div>
         <div id="group-view" class="view">
-            <button id="back-to-timeline" class="back-button">← Back to Timeline</button>
+            <div class="group-view-header">
+                <button id="back-to-timeline" class="back-button">&larr; Timeline</button>
+                <span id="group-view-title" class="group-view-title"></span>
+                <span id="group-view-count" class="group-view-count"></span>
+            </div>
             <div id="group-images"></div>
         </div>
     </div>
     <script type="module">
         import { Timeline, showGroupView } from '/js/gallery.js';
-        
-        // Initialize timeline
+
         const timeline = new Timeline('timeline');
-        
-        // Event Listeners
+
         document.getElementById('back-to-timeline').addEventListener('click', () => {
             document.getElementById('group-view').classList.remove('active');
             document.getElementById('timeline-view').classList.add('active');
         });
     </script>
 </body>
-</html> 
+</html>
