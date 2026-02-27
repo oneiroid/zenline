@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;600;700&display=swap');
+
 * {
     margin: 0;
     padding: 0;
@@ -5,147 +7,300 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f5f5f5;
+    font-family: 'Nunito', sans-serif;
+    background-color: #fdf8f3;
+    color: #3d3429;
+    overflow: hidden;
 }
 
 .container {
-    max-width: 100%;
+    width: 100%;
     height: 100vh;
     margin: 0;
-    padding: 20px;
-    /*overflow-x: hidden;*/
+    padding: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-h1 {
-    text-align: center;
-    margin-bottom: 20px;
-    color: #333;
-    padding: 0 20px;
-}
+/* ── Views ─────────────────────────────── */
 
 .view {
-    display: none;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.4s ease, visibility 0.4s;
 }
 
 .view.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+/* ── Timeline View ─────────────────────── */
+
+#timeline-view {
+    padding: 0;
+}
+
+#timeline-view h1 {
+    text-align: center;
+    padding: 24px 20px 8px;
+    font-weight: 300;
+    font-size: 1.8rem;
+    letter-spacing: 0.15em;
+    color: #6b5e50;
+    text-transform: uppercase;
+}
+
+#timeline-view h1 .subtitle {
     display: block;
+    font-size: 0.65rem;
+    letter-spacing: 0.3em;
+    color: #b8a99a;
+    margin-top: 2px;
+    font-weight: 400;
 }
 
 #timeline {
+    flex: 1;
     width: 100%;
-    height: calc(100vh - 100px);
-    background-color: white;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    /*padding: 20px;*/
     overflow-x: auto;
     overflow-y: hidden;
+    position: relative;
+    /* Custom scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: #d4c4b0 transparent;
+}
+
+#timeline::-webkit-scrollbar {
+    height: 6px;
+}
+
+#timeline::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#timeline::-webkit-scrollbar-thumb {
+    background: #d4c4b0;
+    border-radius: 3px;
+}
+
+#timeline::-webkit-scrollbar-thumb:hover {
+    background: #b8a99a;
 }
 
 #timeline svg {
     min-width: 100%;
 }
 
-.timeline-container {
-    position: relative;
-    width: 100%;
-    height: 100%;
-}
+/* ── Timeline Groups ──────────────────── */
 
 .timeline-group {
     cursor: pointer;
     transform-origin: center center;
-    z-index: 10;
 }
 
-.timeline-group:hover {
-    z-index: 100;
+.timeline-group-background {
+    filter: drop-shadow(0 3px 8px rgba(107, 94, 80, 0.15));
+    transition: filter 0.4s ease;
 }
 
-.timeline-group:hover .timeline-group-label {
-    transition: all 0.3s;
-    transform: translateY(5px);
-    font-weight: bold;
-    fill: #333;
+.timeline-group:hover .timeline-group-background {
+    filter: drop-shadow(0 6px 20px rgba(107, 94, 80, 0.25));
 }
 
 .timeline-group-label {
-    font-size: 12px;
-    fill: #666;
+    font-family: 'Nunito', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    fill: #b8a99a;
     pointer-events: none;
-    transition: all 0.3s;
+    transition: all 0.4s ease;
 }
 
-.thumbnail-circle {
-    pointer-events: none;
+.timeline-group:hover .timeline-group-label {
+    fill: #6b5e50;
+    transform: translateY(3px);
+}
+
+/* Timeline lifeline path */
+.timeline-lifeline {
+    fill: none;
+    stroke: url(#lifeline-gradient);
+    stroke-width: 2;
+    stroke-linecap: round;
+    opacity: 0.4;
+}
+
+/* Time axis */
+.time-axis path,
+.time-axis line {
+    stroke: #d4c4b0;
+    stroke-width: 1px;
+}
+
+.time-axis text {
+    font-family: 'Nunito', sans-serif;
+    font-size: 10px;
+    fill: #b8a99a;
+    font-weight: 600;
+}
+
+/* ── Preview Grid ─────────────────────── */
+
+.preview-container {
+    transition: opacity 0.4s ease;
+}
+
+.preview-container rect {
+    filter: drop-shadow(0 2px 6px rgba(107, 94, 80, 0.12));
+}
+
+/* ── Group View ───────────────────────── */
+
+#group-view {
+    padding: 0;
+    overflow-y: auto;
+    background: #fdf8f3;
+}
+
+.group-view-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(253, 248, 243, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid rgba(212, 196, 176, 0.3);
 }
 
 .back-button {
-    margin: 20px 0;
-    padding: 10px 20px;
-    background-color: #333;
-    color: white;
-    border: none;
-    border-radius: 4px;
+    padding: 8px 18px;
+    background: transparent;
+    color: #6b5e50;
+    border: 1.5px solid #d4c4b0;
+    border-radius: 24px;
     cursor: pointer;
-    font-size: 16px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    transition: all 0.3s ease;
+    white-space: nowrap;
 }
 
 .back-button:hover {
-    background-color: #444;
+    background: #6b5e50;
+    color: #fdf8f3;
+    border-color: #6b5e50;
+    transform: translateX(-2px);
 }
+
+.group-view-title {
+    font-weight: 300;
+    font-size: 1.1rem;
+    color: #b8a99a;
+    letter-spacing: 0.05em;
+}
+
+.group-view-count {
+    font-size: 0.8rem;
+    color: #d4c4b0;
+    margin-left: auto;
+    font-weight: 600;
+}
+
+/* ── Image Grid ───────────────────────── */
 
 #group-images {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 20px;
-    padding: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 24px;
+}
+
+.group-image-wrapper {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: white;
+    box-shadow: 0 2px 12px rgba(107, 94, 80, 0.08);
+    transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+    animation: imageEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.group-image-wrapper:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(107, 94, 80, 0.18);
 }
 
 .group-image {
     width: 100%;
-    height: 200px;
+    aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 4px;
-    transition: transform 0.3s ease;
+    display: block;
+    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-.thumbnail {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 4px;
-    pointer-events: none;
+.group-image-wrapper:hover .group-image {
+    transform: scale(1.05);
 }
 
-.time-axis path {
-    stroke: #999;
-    stroke-width: 1px;
-}
-
-.time-axis line {
-    stroke: #999;
-    stroke-width: 1px;
-    stroke-dasharray: 2,2;
-}
-
-.time-axis text {
+.group-image-date {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 24px 12px 8px;
+    background: linear-gradient(transparent, rgba(61, 52, 41, 0.6));
+    color: rgba(255, 255, 255, 0.9);
     font-size: 11px;
-    fill: #666;
-}
-
-.timeline-group-background {
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
-}
-
-.preview-container {
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    opacity: 0;
     transition: opacity 0.3s ease;
 }
 
-.preview-container rect {
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.1));
+.group-image-wrapper:hover .group-image-date {
+    opacity: 1;
 }
+
+.group-image-3d-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(61, 52, 41, 0.7);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.05em;
+    backdrop-filter: blur(4px);
+}
+
+@keyframes imageEnter {
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ── 3D Model Lightbox ────────────────── */
 
 .model-lightbox {
     position: fixed;
@@ -153,36 +308,101 @@ h1 {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(61, 52, 41, 0.95);
     z-index: 10000;
     display: flex;
     justify-content: center;
     align-items: center;
+    animation: fadeIn 0.3s ease;
 }
 
 .model-viewer-container {
     width: 90%;
     height: 90%;
     position: relative;
+    border-radius: 16px;
+    overflow: hidden;
 }
 
 .model-lightbox-close {
     position: absolute;
     top: 20px;
     right: 20px;
-    width: 40px;
-    height: 40px;
-    background: white;
+    width: 44px;
+    height: 44px;
+    background: rgba(255, 255, 255, 0.9);
     border: none;
     border-radius: 50%;
-    font-size: 24px;
+    font-size: 22px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10001;
+    color: #3d3429;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(4px);
 }
 
 .model-lightbox-close:hover {
-    background: #f0f0f0;
-} 
+    background: white;
+    transform: scale(1.1);
+}
+
+/* ── Shared Animations ────────────────── */
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes gentlePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.015); }
+}
+
+/* ── Lightbox2 Overrides ──────────────── */
+
+.lb-outerContainer {
+    border-radius: 12px !important;
+}
+
+.lb-dataContainer {
+    font-family: 'Nunito', sans-serif !important;
+}
+
+/* ── Responsive ───────────────────────── */
+
+@media (max-width: 768px) {
+    #timeline-view h1 {
+        font-size: 1.3rem;
+        padding: 12px 16px 4px;
+    }
+
+    #timeline-view h1 .subtitle {
+        font-size: 0.55rem;
+    }
+
+    #timeline {
+        max-height: 50vh;
+    }
+
+    #group-images {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+        padding: 16px;
+    }
+
+    .group-view-header {
+        padding: 12px 16px;
+    }
+
+    .back-button {
+        font-size: 13px;
+        padding: 6px 14px;
+    }
+
+    .group-view-title {
+        font-size: 0.95rem;
+    }
+}

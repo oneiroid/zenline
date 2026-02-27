@@ -8,10 +8,24 @@ import moment from 'moment';
 const TRANSITION_DURATION = 2000;
 const MIN_ROTATION_DELAY = 3000;
 const MAX_ADDITIONAL_DELAY = 4000;
-const PREVIEW_GRID_SIZE = 3; // Number of thumbnails in preview grid (3x3)
-const PREVIEW_THUMBNAIL_SIZE = 100; // Size of each preview thumbnail
+const PREVIEW_GRID_SIZE = 3;
+const PREVIEW_THUMBNAIL_SIZE = 80;
+const ENTRANCE_STAGGER = 60; // ms between each circle appearing
 
-// Add 3D viewer class at the top of the file
+// Warm palette
+const PALETTE = {
+    bg: '#fdf8f3',
+    circle_stroke: '#d4c4b0',
+    circle_stroke_hover: '#b8a99a',
+    label: '#b8a99a',
+    label_hover: '#6b5e50',
+    lifeline: '#d4c4b0',
+    lifeline_start: '#e8d5c4',
+    lifeline_end: '#c4b0a0',
+};
+
+// ── 3D Model Viewer ──────────────────────────
+
 class ModelViewer {
     constructor(container) {
         this.container = container;
@@ -29,17 +43,8 @@ class ModelViewer {
         this.renderer.setClearColor(0xdddddd);
         this.container.appendChild(this.renderer.domElement);
 
-        // Add lights
-        //const ambientLight = new THREE.AmbientLight(0xffffff, 200.5);
-        //this.scene.add(ambientLight);
-        //const directionalLight = new THREE.DirectionalLight(0xffffff, 2.5);
-        //directionalLight.position.set(0, 1, 1);
-        //this.scene.add(directionalLight);
-
-
         this.camera.position.z = 5;
-        
-        // Add orbit controls
+
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
@@ -48,7 +53,7 @@ class ModelViewer {
     }
 
     animate = () => {
-        requestAnimationFrame(this.animate);
+        this.animationFrameId = requestAnimationFrame(this.animate);
         this.controls.update();
         this.renderer.render(this.scene, this.camera);
     }
@@ -56,16 +61,13 @@ class ModelViewer {
     loadModel(url) {
         const loader = new GLTFLoader();
         loader.load(url, (gltf) => {
-            // Clear existing model if any
-            while(this.scene.children.length > 0){ 
-                this.scene.remove(this.scene.children[0]); 
+            while (this.scene.children.length > 0) {
+                this.scene.remove(this.scene.children[0]);
             }
-            
-            // Add new model
+
             const model = gltf.scene;
             this.scene.add(model);
 
-            // Center and scale model
             const box = new THREE.Box3().setFromObject(model);
             const center = box.getCenter(new THREE.Vector3());
             const size = box.getSize(new THREE.Vector3());
@@ -74,7 +76,6 @@ class ModelViewer {
             model.scale.multiplyScalar(scale);
             model.position.sub(center.multiplyScalar(scale));
 
-            // Add lights
             const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
             this.scene.add(ambientLight);
             const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
@@ -90,10 +91,15 @@ class ModelViewer {
     }
 
     destroy() {
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+        }
         this.renderer.dispose();
         this.container.removeChild(this.renderer.domElement);
     }
 }
+
+// ── Timeline Group (single circle node) ──────
 
 class TimelineGroup {
     constructor(data, index, position, container) {
@@ -113,56 +119,92 @@ class TimelineGroup {
             .attr('class', 'timeline-group')
             .attr('transform', `translate(${this.position.x},${this.position.y})`);
 
-        // Create a container for scale transitions
-        this.scaleGroup = this.group.append('g');
+        // Scale wrapper for hover + entrance animation
+        this.scaleGroup = this.group.append('g')
+            .attr('transform', 'scale(0)')
+            .style('opacity', 0);
 
-        // Add background circle
+        // Entrance animation — staggered pop-in
+        this.scaleGroup.transition()
+            .delay(this.index * ENTRANCE_STAGGER)
+            .duration(600)
+            .ease(d3.easeBackOut.overshoot(1.2))
+            .attr('transform', 'scale(1)')
+            .style('opacity', 1);
+
+        // Background circle
         this.scaleGroup.append('circle')
             .attr('r', this.position.radius)
             .attr('class', 'timeline-group-background')
             .style('fill', '#ffffff')
-            .style('stroke', '#999')
-            .style('stroke-width', '4px')
+            .style('stroke', PALETTE.circle_stroke)
+            .style('stroke-width', '2.5px')
             .style('cursor', 'pointer');
 
-        // Add label
-        this.group.append('text')
+        // Label below circle
+        this.labelEl = this.group.append('text')
             .attr('class', 'timeline-group-label')
-            .attr('y', this.position.radius + 20)
+            .attr('y', this.position.radius + 18)
             .attr('text-anchor', 'middle')
-            .text(`${this.data.dateRange} (${this.data.images.length})`);
+            .style('opacity', 0);
 
-        // Initialize preview grid container
+        // Date range
+        this.labelEl.append('tspan')
+            .attr('x', 0)
+            .text(this.formatDateRange());
+
+        // Image count on second line
+        this.labelEl.append('tspan')
+            .attr('x', 0)
+            .attr('dy', '1.2em')
+            .style('font-weight', '300')
+            .style('font-size', '10px')
+            .text(`${this.data.images.length} drawings`);
+
+        // Fade label in after circle appears
+        this.labelEl.transition()
+            .delay(this.index * ENTRANCE_STAGGER + 400)
+            .duration(400)
+            .style('opacity', 1);
+
+        // Preview grid (appears on hover, above circle)
         this.previewContainer = this.group.append('g')
             .attr('class', 'preview-container')
             .style('opacity', 0)
             .attr('pointer-events', 'none');
 
-        // Initialize thumbnail system
         this.initializeThumbnail();
         this.initializePreviewGrid();
         this.startRotation();
 
-        // Add hover and click handlers
         this.group
             .on('click', () => this.onClick())
             .on('mouseenter', () => this.onHover(true))
             .on('mouseleave', () => this.onHover(false));
     }
 
+    formatDateRange() {
+        const start = moment(this.data.startDate);
+        const end = moment(this.data.endDate);
+        if (start.isSame(end, 'month')) {
+            return start.format('MMM YYYY');
+        }
+        if (start.isSame(end, 'year')) {
+            return `${start.format('MMM')} – ${end.format('MMM YYYY')}`;
+        }
+        return `${start.format('MMM YY')} – ${end.format('MMM YY')}`;
+    }
+
     initializeThumbnail() {
-        // Create main image container inside scale group
         this.imageContainer = this.scaleGroup.append('g')
             .attr('class', 'thumbnail-container');
 
-        // Add clip path
-        const clipPath = this.group.append('defs')
+        this.group.append('defs')
             .append('clipPath')
             .attr('id', `clip-${this.index}`)
             .append('circle')
             .attr('r', this.position.radius);
 
-        // Set initial image
         this.setNewImage();
     }
 
@@ -171,16 +213,15 @@ class TimelineGroup {
         const newImage = this.createImageElement(newImageData);
 
         if (transition && this.currentImage) {
-            // Start new image fully transparent
             newImage.style('opacity', 0);
             newImage
                 .transition()
                 .duration(TRANSITION_DURATION)
                 .style('opacity', 1)
                 .on('end', () => {
-                    if(this.currentImage) {
-                      this.currentImage.remove();
-                      this.currentImage = newImage;
+                    if (this.currentImage) {
+                        this.currentImage.remove();
+                        this.currentImage = newImage;
                     }
                 });
         } else {
@@ -190,8 +231,6 @@ class TimelineGroup {
             }
             this.currentImage = newImage;
         }
-
-        
     }
 
     createImageElement(imagePath) {
@@ -223,50 +262,50 @@ class TimelineGroup {
 
     initializePreviewGrid() {
         const gridSize = Math.min(PREVIEW_GRID_SIZE, Math.ceil(Math.sqrt(this.data.images.length)));
-        const totalWidth = gridSize * PREVIEW_THUMBNAIL_SIZE;
+        const thumbSize = PREVIEW_THUMBNAIL_SIZE;
+        const gap = 4;
+        const totalWidth = gridSize * thumbSize + (gridSize - 1) * gap;
         const startX = -totalWidth / 2;
-        const startY = -this.position.radius - totalWidth - 20;
+        const startY = -this.position.radius - totalWidth - 24;
 
+        // Rounded background for the preview grid
         this.previewContainer.append('rect')
-            .attr('width', totalWidth)
-            .attr('height', totalWidth)
-            .attr('transform', `translate(${startX},${startY})`)
-            .style('fill', '#ddd');
+            .attr('width', totalWidth + 8)
+            .attr('height', totalWidth + 8)
+            .attr('rx', 8)
+            .attr('transform', `translate(${startX - 4},${startY - 4})`)
+            .style('fill', 'white')
+            .style('stroke', PALETTE.circle_stroke)
+            .style('stroke-width', '1px');
 
-        // Create clip paths for preview thumbnails
-        const previewClipPath = this.group.append('defs')
+        const previewClip = this.group.append('defs')
             .append('clipPath')
             .attr('id', `preview-clip-${this.index}`)
             .append('rect')
-            .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
-            .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
-            .attr('rx', 4);
+            .attr('width', thumbSize - 2)
+            .attr('height', thumbSize - 2)
+            .attr('rx', 6);
 
-        // Select random images for preview
         const previewImages = this.getRandomPreviewImages(gridSize * gridSize);
 
         previewImages.forEach((img, i) => {
             const row = Math.floor(i / gridSize);
             const col = i % gridSize;
-            const x = startX + col * PREVIEW_THUMBNAIL_SIZE;
-            const y = startY + row * PREVIEW_THUMBNAIL_SIZE;
+            const x = startX + col * (thumbSize + gap);
+            const y = startY + row * (thumbSize + gap);
 
             const previewGroup = this.previewContainer.append('g')
                 .attr('transform', `translate(${x},${y})`);
 
-            // Add background for thumbnail
             previewGroup.append('rect')
-                .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
-                .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
-                .attr('rx', 4)
-                .style('fill', '#fff')
-                .style('stroke', '#ddd')
-                .style('stroke-width', '1px');
+                .attr('width', thumbSize - 2)
+                .attr('height', thumbSize - 2)
+                .attr('rx', 6)
+                .style('fill', '#f5efe8');
 
-            // Add image
             const thumbnail = previewGroup.append('image')
-                .attr('width', PREVIEW_THUMBNAIL_SIZE - 4)
-                .attr('height', PREVIEW_THUMBNAIL_SIZE - 4)
+                .attr('width', thumbSize - 2)
+                .attr('height', thumbSize - 2)
                 .attr('clip-path', `url(#preview-clip-${this.index})`)
                 .attr('preserveAspectRatio', 'xMidYMid slice')
                 .attr('xlink:href', `/imgs/${img.filename}`);
@@ -279,39 +318,35 @@ class TimelineGroup {
         const images = [...this.data.images];
         const result = [];
         count = Math.min(count, images.length);
-        
+
         for (let i = 0; i < count; i++) {
             const randomIndex = Math.floor(Math.random() * images.length);
             result.push(images.splice(randomIndex, 1)[0]);
         }
-        
+
         return result;
     }
 
     onHover(isHovered) {
         if (isHovered) {
-            this.group.raise(); // Move group to the top of the rendering stack
+            this.group.raise();
         }
 
-        // Scale transition
         this.scaleGroup.transition()
-            .duration(300)
-            .attr('transform', isHovered ? 'scale(1.1)' : 'scale(1)');
+            .duration(350)
+            .ease(d3.easeCubicOut)
+            .attr('transform', isHovered ? 'scale(1.08)' : 'scale(1)');
 
-        // Preview grid transition
         this.previewContainer.transition()
             .duration(300)
             .style('opacity', isHovered ? 1 : 0);
 
-        //this.previewContainer.style('z-index', isHovered ? 1000 : 10);
-
-        // Style changes
         this.group.select('.timeline-group-background')
             .transition()
-            .duration(300)
-            .style('stroke-width', isHovered ? '5px' : '3px');
+            .duration(350)
+            .style('stroke-width', isHovered ? '3px' : '2.5px')
+            .style('stroke', isHovered ? PALETTE.circle_stroke_hover : PALETTE.circle_stroke);
 
-        // Stop/start rotation on hover
         if (isHovered) {
             this.stopRotation();
         } else {
@@ -328,6 +363,8 @@ class TimelineGroup {
         this.group.remove();
     }
 }
+
+// ── Timeline ─────────────────────────────────
 
 class Timeline {
     constructor(containerId) {
@@ -347,35 +384,28 @@ class Timeline {
     }
 
     async fetchImageGroups() {
-        try {
-            const response = await fetch('/data/images.json');
-            if (!response.ok) {
-                throw new Error('Failed to fetch image groups');
-            }
-            const data = await response.json();
-            // Convert date strings back to moment objects
-            this.imageGroups = data.map(group => ({
-                ...group,
-                startDate: moment(group.startDate),
-                endDate: moment(group.endDate),
-                centerDate: moment(group.centerDate),
-                images: group.images.map(img => ({
-                    ...img,
-                    date: moment(img.date)
-                }))
-            }));
-            // Sort by center date
-            this.imageGroups.sort((a, b) => a.centerDate.valueOf() - b.centerDate.valueOf());
-        } catch (error) {
-            console.error('Error fetching image groups:', error);
-            this.imageGroups = [];
-        }
+        const response = await fetch('/data/images.json');
+        if (!response.ok) throw new Error('Failed to fetch image groups');
+        const data = await response.json();
+
+        this.imageGroups = data.map(group => ({
+            ...group,
+            startDate: moment(group.startDate),
+            endDate: moment(group.endDate),
+            centerDate: moment(group.centerDate),
+            images: group.images.map(img => ({
+                ...img,
+                date: moment(img.date)
+            }))
+        }));
+
+        this.imageGroups.sort((a, b) => a.centerDate.valueOf() - b.centerDate.valueOf());
     }
 
     createTimelineSVG() {
-        const margin = { top: 20, right: 10, bottom: 60, left: 10 };
+        const margin = { top: 40, right: 20, bottom: 60, left: 20 };
         const container = document.getElementById(this.containerId);
-        const minWidth = Math.max(container.clientWidth, this.imageGroups.length * 60);
+        const minWidth = Math.max(container.clientWidth, this.imageGroups.length * 140);
         const width = minWidth - margin.left - margin.right;
         const height = container.clientHeight - margin.top - margin.bottom;
 
@@ -388,41 +418,78 @@ class Timeline {
             .append('g')
             .attr('transform', `translate(${margin.left},${margin.top})`);
 
+        // Define gradient for lifeline
+        const defs = svg.append('defs');
+        const gradient = defs.append('linearGradient')
+            .attr('id', 'lifeline-gradient')
+            .attr('x1', '0%').attr('y1', '0%')
+            .attr('x2', '100%').attr('y2', '0%');
+        gradient.append('stop')
+            .attr('offset', '0%')
+            .attr('stop-color', PALETTE.lifeline_start);
+        gradient.append('stop')
+            .attr('offset', '100%')
+            .attr('stop-color', PALETTE.lifeline_end);
+
         return { svg, margin, width, height };
     }
 
     createScales(width, height) {
-        const timeExtent = [new Date(this.imageGroups[0].startDate), new Date(this.imageGroups.at(-1).endDate)];
+        const timeExtent = [
+            new Date(this.imageGroups[0].startDate),
+            new Date(this.imageGroups.at(-1).endDate)
+        ];
         const padding = (timeExtent[1] - timeExtent[0]) * 0.05;
 
         const xScale = d3.scaleTime()
             .domain([
                 new Date(timeExtent[0] - padding),
-                new Date(timeExtent[1] + padding)
+                new Date(timeExtent[1].getTime() + padding)
             ])
             .range([0, width]);
 
-        const sizeScale = d3.scaleLinear()
+        // Sqrt scale so area is proportional to image count (not radius)
+        const sizeScale = d3.scaleSqrt()
             .domain([0, d3.max(this.imageGroups, d => d.size)])
-            .range([30, 110]);
+            .range([24, 72]);
 
         return { xScale, sizeScale };
     }
 
     addTimeAxis(svg, xScale, height) {
         const timeAxis = d3.axisBottom(xScale)
-            .ticks(d3.timeMonth.every(2))
-            .tickFormat(d3.timeFormat('%Y-%m'));
+            .ticks(d3.timeYear.every(1))
+            .tickFormat(d3.timeFormat('%Y'));
 
         svg.append('g')
             .attr('class', 'time-axis')
-            .attr('transform', `translate(0,${height - 20})`)
+            .attr('transform', `translate(0,${height - 10})`)
             .call(timeAxis)
             .selectAll('text')
-            .style('text-anchor', 'end')
-            .attr('dx', '-.8em')
-            .attr('dy', '.15em')
-            .attr('transform', 'rotate(-45)');
+            .style('text-anchor', 'middle');
+    }
+
+    addLifeline(svg, positions) {
+        if (positions.length < 2) return;
+
+        const lineGen = d3.line()
+            .x(d => d.x)
+            .y(d => d.y)
+            .curve(d3.curveCatmullRom.alpha(0.5));
+
+        const path = svg.insert('path', ':first-child')
+            .attr('class', 'timeline-lifeline')
+            .attr('d', lineGen(positions));
+
+        // Animate the lifeline drawing
+        const totalLength = path.node().getTotalLength();
+        path
+            .attr('stroke-dasharray', totalLength)
+            .attr('stroke-dashoffset', totalLength)
+            .transition()
+            .duration(1500)
+            .ease(d3.easeQuadOut)
+            .attr('stroke-dashoffset', 0);
     }
 
     calculateGroupPositions(xScale, sizeScale, height) {
@@ -438,21 +505,18 @@ class Timeline {
             };
         });
 
-        // Create force simulation
         const simulation = d3.forceSimulation(nodes)
-            .force('x', d3.forceX(d => d.x).strength(0.9)) // Keep x position based on date
-            .force('y', d3.forceY(height / 2).strength(0.01)) // Gentle force towards vertical center
-            .force('collision', d3.forceCollide().radius(d => d.radius * 1.3))
+            .force('x', d3.forceX(d => d.x).strength(0.8))
+            .force('y', d3.forceY(height / 2).strength(0.05))
+            .force('collision', d3.forceCollide().radius(d => d.radius * 1.5).strength(0.9))
             .stop();
 
-        // Run the simulation
         for (let i = 0; i < 300; ++i) simulation.tick();
 
-        // Convert simulation results to positions
         nodes.forEach(node => {
             positions[node.index] = {
                 x: node.x,
-                y: Math.max(node.radius, Math.min(height - node.radius - 40, node.y)),
+                y: Math.max(node.radius + 10, Math.min(height - node.radius - 50, node.y)),
                 radius: node.radius
             };
         });
@@ -468,7 +532,11 @@ class Timeline {
         const { xScale, sizeScale } = this.createScales(width, height);
 
         const positions = this.calculateGroupPositions(xScale, sizeScale, height);
-        
+
+        // Draw lifeline through all group centers
+        this.addLifeline(svg, positions);
+
+        // Create group circles
         this.groups = this.imageGroups.map((data, index) =>
             new TimelineGroup(data, index, positions[index], svg)
         );
@@ -487,85 +555,117 @@ class Timeline {
     }
 }
 
+// ── Group View ───────────────────────────────
+
 function showGroupView(group) {
     document.getElementById('timeline-view').classList.remove('active');
-    document.getElementById('group-view').classList.add('active');
+
+    const groupView = document.getElementById('group-view');
+    groupView.classList.add('active');
+
+    // Set header info
+    const start = moment(group.startDate);
+    const end = moment(group.endDate);
+    let rangeLabel;
+    if (start.isSame(end, 'month')) {
+        rangeLabel = start.format('MMMM YYYY');
+    } else if (start.isSame(end, 'year')) {
+        rangeLabel = `${start.format('MMMM')} – ${end.format('MMMM YYYY')}`;
+    } else {
+        rangeLabel = `${start.format('MMM YYYY')} – ${end.format('MMM YYYY')}`;
+    }
+
+    document.getElementById('group-view-title').textContent = rangeLabel;
+    document.getElementById('group-view-count').textContent = `${group.images.length} drawings`;
 
     const container = document.getElementById('group-images');
     container.innerHTML = '';
 
-    group.images.forEach(img => {
+    // Sort images by date within the group
+    const sortedImages = [...group.images].sort((a, b) =>
+        moment(a.date).valueOf() - moment(b.date).valueOf()
+    );
+
+    sortedImages.forEach((img, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'group-image-wrapper';
+        wrapper.style.animationDelay = `${i * 40}ms`;
+
         const imgElement = document.createElement('a');
         if (img.glbFile) {
-            // For GLB models, create a custom lightbox
             imgElement.href = '#';
-            imgElement.setAttribute('data-glb', `/imgs/${img.glbFile}`);
             imgElement.onclick = (e) => {
                 e.preventDefault();
                 showModelLightbox(img.glbFile);
             };
+
+            const badge = document.createElement('span');
+            badge.className = 'group-image-3d-badge';
+            badge.textContent = '3D';
+            wrapper.appendChild(badge);
         } else {
-            // Regular image lightbox
             imgElement.href = `/imgs/${img.filename}`;
             imgElement.setAttribute('data-lightbox', 'group');
-            imgElement.setAttribute('data-title', img.filename);
+            imgElement.setAttribute('data-title', moment(img.date).format('MMMM D, YYYY'));
         }
 
         const image = document.createElement('img');
         image.src = `/imgs/${img.filename}`;
         image.className = 'group-image';
+        image.loading = 'lazy';
+
+        const dateLabel = document.createElement('div');
+        dateLabel.className = 'group-image-date';
+        dateLabel.textContent = moment(img.date).format('MMM D, YYYY');
 
         imgElement.appendChild(image);
-        container.appendChild(imgElement);
+        wrapper.appendChild(imgElement);
+        wrapper.appendChild(dateLabel);
+        container.appendChild(wrapper);
     });
+
+    // Scroll to top
+    groupView.scrollTop = 0;
 }
 
+// ── 3D Model Lightbox ────────────────────────
+
 function showModelLightbox(glbFile) {
-    // Create lightbox container
     const lightboxContainer = document.createElement('div');
     lightboxContainer.className = 'model-lightbox';
     document.body.appendChild(lightboxContainer);
 
-    // Create close button
     const closeButton = document.createElement('button');
     closeButton.className = 'model-lightbox-close';
-    closeButton.innerHTML = '×';
+    closeButton.innerHTML = '&times;';
     lightboxContainer.appendChild(closeButton);
 
-    // Create viewer container
     const viewerContainer = document.createElement('div');
     viewerContainer.className = 'model-viewer-container';
     lightboxContainer.appendChild(viewerContainer);
 
-    // Initialize viewer
     const viewer = new ModelViewer(viewerContainer);
     viewer.loadModel(`/imgs/${glbFile}`);
 
-    // Handle close
-    closeButton.onclick = () => {
-        viewer.destroy();
-        document.body.removeChild(lightboxContainer);
-    };
-
-    // Handle resize
     const handleResize = () => viewer.resize();
     window.addEventListener('resize', handleResize);
 
-    // Handle escape key
     const handleKeyup = (e) => {
-        if (e.key === 'Escape') {
-            closeButton.click();
-        }
+        if (e.key === 'Escape') close();
     };
     window.addEventListener('keyup', handleKeyup);
 
-    // Cleanup event listeners when closing
-    const cleanup = () => {
+    function close() {
         window.removeEventListener('resize', handleResize);
         window.removeEventListener('keyup', handleKeyup);
-    };
-    lightboxContainer.addEventListener('remove', cleanup);
+        viewer.destroy();
+        document.body.removeChild(lightboxContainer);
+    }
+
+    closeButton.onclick = close;
 }
+
+// ── Helpers ──────────────────────────────────
 
 function debounce(func, wait) {
     let timeout;
@@ -579,14 +679,4 @@ function debounce(func, wait) {
     };
 }
 
-// Event Listeners
-document.getElementById('back-to-timeline').addEventListener('click', () => {
-    document.getElementById('group-view').classList.remove('active');
-    document.getElementById('timeline-view').classList.add('active');
-});
-
-// Initialize timeline
-const timeline = new Timeline('timeline');
-
-// Export functions and classes that need to be accessed from outside
 export { Timeline, showGroupView, showModelLightbox };
