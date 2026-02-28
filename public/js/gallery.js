@@ -109,7 +109,7 @@ class TimelineGroup {
         this.container = container;
         this.currentImage = null;
         this.rotationInterval = null;
-        this.previewThumbnails = [];
+        this.previewGroups = [];
         this.initialize();
     }
 
@@ -167,10 +167,9 @@ class TimelineGroup {
             .duration(400)
             .style('opacity', 1);
 
-        // Preview grid (appears on hover, above circle)
+        // Preview grid (appears on hover, connected to circle)
         this.previewContainer = this.group.append('g')
             .attr('class', 'preview-container')
-            .style('opacity', 0)
             .attr('pointer-events', 'none');
 
         this.initializeThumbnail();
@@ -263,54 +262,138 @@ class TimelineGroup {
     initializePreviewGrid() {
         const gridSize = Math.min(PREVIEW_GRID_SIZE, Math.ceil(Math.sqrt(this.data.images.length)));
         const thumbSize = PREVIEW_THUMBNAIL_SIZE;
-        const gap = 4;
-        const totalWidth = gridSize * thumbSize + (gridSize - 1) * gap;
-        const startX = -totalWidth / 2;
-        const startY = -this.position.radius - totalWidth - 24;
+        const gap = 5;
+        const padding = 10;
+        const numToShow = Math.min(gridSize * gridSize, this.data.images.length);
+        const numCols = gridSize;
+        const numRows = Math.ceil(numToShow / numCols);
+        const totalGridWidth = numCols * thumbSize + (numCols - 1) * gap;
+        const totalGridHeight = numRows * thumbSize + (numRows - 1) * gap;
+        const remaining = this.data.images.length - numToShow;
+        const moreLabelHeight = remaining > 0 ? 22 : 0;
+        const bgWidth = totalGridWidth + padding * 2;
+        const bgHeight = totalGridHeight + padding * 2 + moreLabelHeight;
+        const arrowSize = 8;
 
-        // Rounded background for the preview grid
-        this.previewContainer.append('rect')
-            .attr('width', totalWidth + 8)
-            .attr('height', totalWidth + 8)
-            .attr('rx', 8)
-            .attr('transform', `translate(${startX - 4},${startY - 4})`)
-            .style('fill', 'white')
-            .style('stroke', PALETTE.circle_stroke)
-            .style('stroke-width', '1px');
+        // Smart positioning: flip below only if not enough room above AND enough below
+        const spaceAbove = this.position.y - this.position.radius;
+        const spaceBelow = (this.position.areaHeight || 500) - this.position.y - this.position.radius;
+        const neededHeight = bgHeight + arrowSize + 20;
+        const showBelow = spaceAbove < neededHeight && spaceBelow >= neededHeight;
 
-        const previewClip = this.group.append('defs')
-            .append('clipPath')
-            .attr('id', `preview-clip-${this.index}`)
-            .append('rect')
-            .attr('width', thumbSize - 2)
-            .attr('height', thumbSize - 2)
-            .attr('rx', 6);
+        const cardX = -bgWidth / 2;
+        let cardY;
+        if (showBelow) {
+            cardY = this.position.radius + 14 + arrowSize;
+        } else {
+            cardY = -this.position.radius - 14 - arrowSize - bgHeight;
+        }
 
-        const previewImages = this.getRandomPreviewImages(gridSize * gridSize);
+        // SVG drop-shadow filter for the card
+        const filterId = `preview-shadow-${this.index}`;
+        const filter = this.group.append('defs').append('filter')
+            .attr('id', filterId)
+            .attr('x', '-20%').attr('y', '-20%')
+            .attr('width', '140%').attr('height', '140%');
+        filter.append('feDropShadow')
+            .attr('dx', 0).attr('dy', 4)
+            .attr('stdDeviation', 12)
+            .attr('flood-color', 'rgba(107, 94, 80, 0.2)');
+
+        // Background group: card + arrow + optional label
+        this.previewBg = this.previewContainer.append('g')
+            .attr('filter', `url(#${filterId})`)
+            .style('opacity', 0);
+
+        // Card rectangle
+        this.previewBg.append('rect')
+            .attr('x', cardX)
+            .attr('y', cardY)
+            .attr('width', bgWidth)
+            .attr('height', bgHeight)
+            .attr('rx', 14)
+            .style('fill', 'rgba(255, 255, 255, 0.97)');
+
+        // Arrow pointer connecting the card to the circle
+        if (showBelow) {
+            const tipY = cardY - arrowSize;
+            this.previewBg.append('polygon')
+                .attr('points', `0,${tipY} ${arrowSize},${cardY + 1} ${-arrowSize},${cardY + 1}`)
+                .style('fill', 'rgba(255, 255, 255, 0.97)');
+        } else {
+            const tipY = cardY + bgHeight + arrowSize;
+            this.previewBg.append('polygon')
+                .attr('points', `${-arrowSize},${cardY + bgHeight - 1} ${arrowSize},${cardY + bgHeight - 1} 0,${tipY}`)
+                .style('fill', 'rgba(255, 255, 255, 0.97)');
+        }
+
+        // "+N more" label when group has more images than shown
+        if (remaining > 0) {
+            this.previewBg.append('text')
+                .attr('x', 0)
+                .attr('y', cardY + padding + totalGridHeight + 16)
+                .attr('text-anchor', 'middle')
+                .style('font-family', "'Nunito', sans-serif")
+                .style('font-size', '11px')
+                .style('font-weight', '600')
+                .style('fill', PALETTE.label)
+                .text(`+${remaining} more`);
+        }
+
+        // Thumbnail images — each with individual clip + scale animation
+        const gridStartX = cardX + padding;
+        const gridStartY = cardY + padding;
+        const previewImages = this.getRandomPreviewImages(numToShow);
 
         previewImages.forEach((img, i) => {
-            const row = Math.floor(i / gridSize);
-            const col = i % gridSize;
-            const x = startX + col * (thumbSize + gap);
-            const y = startY + row * (thumbSize + gap);
+            const row = Math.floor(i / numCols);
+            const col = i % numCols;
+            const x = gridStartX + col * (thumbSize + gap);
+            const y = gridStartY + row * (thumbSize + gap);
+            const cx = x + thumbSize / 2;
+            const cy = y + thumbSize / 2;
 
-            const previewGroup = this.previewContainer.append('g')
-                .attr('transform', `translate(${x},${y})`);
+            // Per-thumbnail rounded clip path
+            const clipId = `preview-clip-${this.index}-${i}`;
+            this.group.append('defs')
+                .append('clipPath')
+                .attr('id', clipId)
+                .append('rect')
+                .attr('x', -thumbSize / 2)
+                .attr('y', -thumbSize / 2)
+                .attr('width', thumbSize)
+                .attr('height', thumbSize)
+                .attr('rx', 8);
 
-            previewGroup.append('rect')
-                .attr('width', thumbSize - 2)
-                .attr('height', thumbSize - 2)
-                .attr('rx', 6)
+            // Outer group: static position at thumbnail center
+            const outerG = this.previewContainer.append('g')
+                .attr('transform', `translate(${cx},${cy})`);
+
+            // Inner group: animated scale + opacity
+            const innerG = outerG.append('g')
+                .attr('transform', 'scale(0)')
+                .style('opacity', 0);
+
+            // Placeholder background
+            innerG.append('rect')
+                .attr('x', -thumbSize / 2)
+                .attr('y', -thumbSize / 2)
+                .attr('width', thumbSize)
+                .attr('height', thumbSize)
+                .attr('rx', 8)
                 .style('fill', '#f5efe8');
 
-            const thumbnail = previewGroup.append('image')
-                .attr('width', thumbSize - 2)
-                .attr('height', thumbSize - 2)
-                .attr('clip-path', `url(#preview-clip-${this.index})`)
+            // Thumbnail image
+            innerG.append('image')
+                .attr('x', -thumbSize / 2)
+                .attr('y', -thumbSize / 2)
+                .attr('width', thumbSize)
+                .attr('height', thumbSize)
+                .attr('clip-path', `url(#${clipId})`)
                 .attr('preserveAspectRatio', 'xMidYMid slice')
                 .attr('xlink:href', `/imgs/${img.filename}`);
 
-            this.previewThumbnails.push(thumbnail);
+            this.previewGroups.push(innerG);
         });
     }
 
@@ -332,15 +415,30 @@ class TimelineGroup {
             this.group.raise();
         }
 
+        // Circle scale
         this.scaleGroup.transition()
             .duration(350)
             .ease(d3.easeCubicOut)
             .attr('transform', isHovered ? 'scale(1.08)' : 'scale(1)');
 
-        this.previewContainer.transition()
-            .duration(300)
-            .style('opacity', isHovered ? 1 : 0);
+        // Preview card background — smooth fade
+        if (this.previewBg) {
+            this.previewBg.transition()
+                .duration(isHovered ? 250 : 200)
+                .style('opacity', isHovered ? 1 : 0);
+        }
 
+        // Staggered thumbnail entrance/exit
+        this.previewGroups.forEach((pg, i) => {
+            pg.transition()
+                .duration(isHovered ? 300 : 150)
+                .delay(isHovered ? 50 + i * 30 : 0)
+                .ease(isHovered ? d3.easeBackOut.overshoot(1.4) : d3.easeCubicIn)
+                .attr('transform', isHovered ? 'scale(1)' : 'scale(0)')
+                .style('opacity', isHovered ? 1 : 0);
+        });
+
+        // Circle stroke
         this.group.select('.timeline-group-background')
             .transition()
             .duration(350)
@@ -517,7 +615,8 @@ class Timeline {
             positions[node.index] = {
                 x: node.x,
                 y: Math.max(node.radius + 10, Math.min(height - node.radius - 50, node.y)),
-                radius: node.radius
+                radius: node.radius,
+                areaHeight: height
             };
         });
 

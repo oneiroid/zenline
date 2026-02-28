@@ -155,14 +155,7 @@ body {
 }
 
 /* ── Preview Grid ─────────────────────── */
-
-.preview-container {
-    transition: opacity 0.4s ease;
-}
-
-.preview-container rect {
-    filter: drop-shadow(0 2px 6px rgba(107, 94, 80, 0.12));
-}
+/* Animations handled by D3 transitions in gallery.js */
 
 /* ── Group View ───────────────────────── */
 
