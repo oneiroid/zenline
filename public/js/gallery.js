@@ -651,6 +651,15 @@ class Timeline {
     setupEventListeners() {
         const debouncedRender = debounce(() => this.render(), 250);
         window.addEventListener('resize', debouncedRender);
+
+        // Convert vertical mouse wheel to horizontal scroll on the timeline
+        const container = document.getElementById(this.containerId);
+        container.addEventListener('wheel', (e) => {
+            if (e.deltaY !== 0) {
+                e.preventDefault();
+                container.scrollLeft += e.deltaY;
+            }
+        }, { passive: false });
     }
 }
 
