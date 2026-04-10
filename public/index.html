@@ -35,15 +35,6 @@
             <div id="group-images"></div>
         </div>
     </div>
-    <script type="module">
-        import { Timeline, showGroupView } from '/js/gallery.js';
-
-        const timeline = new Timeline('timeline');
-
-        document.getElementById('back-to-timeline').addEventListener('click', () => {
-            document.getElementById('group-view').classList.remove('active');
-            document.getElementById('timeline-view').classList.add('active');
-        });
-    </script>
+    <script type="module" src="/js/main.js"></script>
 </body>
 </html>
