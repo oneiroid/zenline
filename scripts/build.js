@@ -75,9 +75,18 @@ function copyStatic() {
 function writeIndexHtml() {
     const src = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
     const rewritten = src
-        .replace('/css/style.css', '/css/style.min.css')
-        .replace('/js/main.js', '/js/main.min.js');
+        .replace('/css/style.css', 'css/style.min.css')
+        .replace('/js/main.js', 'js/main.min.js');
     fs.writeFileSync(path.join(DIST_DIR, 'index.html'), rewritten);
+}
+
+function rewriteBundlePaths() {
+    const jsFile = path.join(DIST_DIR, 'js', 'main.min.js');
+    const src = fs.readFileSync(jsFile, 'utf8');
+    const rewritten = src
+        .replace(/(["'`])\/imgs\//g, '$1imgs/')
+        .replace(/(["'`])\/data\//g, '$1data/');
+    fs.writeFileSync(jsFile, rewritten);
 }
 
 (async () => {
@@ -87,6 +96,7 @@ function writeIndexHtml() {
     await regenerateImagesJson();
     await Promise.all([bundleJS(), bundleCSS()]);
     copyStatic();
+    rewriteBundlePaths();
     writeIndexHtml();
     console.log(`[build] done in ${Date.now() - t0}ms -> ${path.relative(ROOT, DIST_DIR)}`);
 })().catch((err) => {
