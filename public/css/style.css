@@ -72,33 +72,23 @@ body {
 #timeline {
     flex: 1;
     width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
     position: relative;
-    /* Custom scrollbar */
-    scrollbar-width: thin;
-    scrollbar-color: #d4c4b0 transparent;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+    scrollbar-width: none;
 }
 
 #timeline::-webkit-scrollbar {
-    height: 6px;
-}
-
-#timeline::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-#timeline::-webkit-scrollbar-thumb {
-    background: #d4c4b0;
-    border-radius: 3px;
-}
-
-#timeline::-webkit-scrollbar-thumb:hover {
-    background: #b8a99a;
+    width: 0;
+    display: none;
 }
 
 #timeline svg {
-    min-width: 100%;
+    width: 100%;
+    display: block;
+    touch-action: pan-y;
 }
 
 /* ── Timeline Groups ──────────────────── */
@@ -106,15 +96,11 @@ body {
 .timeline-group {
     cursor: pointer;
     transform-origin: center center;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .timeline-group-background {
-    filter: drop-shadow(0 3px 8px rgba(107, 94, 80, 0.15));
-    transition: filter 0.4s ease;
-}
-
-.timeline-group:hover .timeline-group-background {
-    filter: drop-shadow(0 6px 20px rgba(107, 94, 80, 0.25));
+    filter: drop-shadow(0 3px 10px rgba(107, 94, 80, 0.18));
 }
 
 .timeline-group-label {
@@ -123,12 +109,6 @@ body {
     font-weight: 600;
     fill: #b8a99a;
     pointer-events: none;
-    transition: all 0.4s ease;
-}
-
-.timeline-group:hover .timeline-group-label {
-    fill: #6b5e50;
-    transform: translateY(3px);
 }
 
 /* Timeline lifeline path */
@@ -194,11 +174,11 @@ body {
     white-space: nowrap;
 }
 
-.back-button:hover {
+.back-button:active {
     background: #6b5e50;
     color: #fdf8f3;
     border-color: #6b5e50;
-    transform: translateX(-2px);
+    transform: scale(0.96);
 }
 
 .group-view-title {
@@ -219,9 +199,9 @@ body {
 
 #group-images {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 16px;
-    padding: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+    padding: 14px;
 }
 
 .group-image-wrapper {
@@ -236,8 +216,8 @@ body {
     animation: imageEnter 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
-.group-image-wrapper:hover {
-    transform: translateY(-4px) scale(1.02);
+.group-image-wrapper:active {
+    transform: scale(0.97);
     box-shadow: 0 8px 30px rgba(107, 94, 80, 0.18);
 }
 
@@ -246,11 +226,6 @@ body {
     aspect-ratio: 1;
     object-fit: cover;
     display: block;
-    transition: transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-}
-
-.group-image-wrapper:hover .group-image {
-    transform: scale(1.05);
 }
 
 .group-image-date {
@@ -258,18 +233,12 @@ body {
     bottom: 0;
     left: 0;
     right: 0;
-    padding: 24px 12px 8px;
+    padding: 18px 10px 6px;
     background: linear-gradient(transparent, rgba(61, 52, 41, 0.6));
     color: rgba(255, 255, 255, 0.9);
     font-size: 11px;
     font-weight: 600;
     letter-spacing: 0.05em;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-}
-
-.group-image-wrapper:hover .group-image-date {
-    opacity: 1;
 }
 
 .group-image-3d-badge {
@@ -366,36 +335,24 @@ body {
 
 /* ── Responsive ───────────────────────── */
 
-@media (max-width: 768px) {
-    #timeline-view h1 {
-        font-size: 1.3rem;
-        padding: 12px 16px 4px;
-    }
+#timeline-view h1 {
+    font-size: 1.3rem;
+    padding: 14px 16px 4px;
+}
 
-    #timeline-view h1 .subtitle {
-        font-size: 0.55rem;
-    }
+#timeline-view h1 .subtitle {
+    font-size: 0.55rem;
+}
 
-    #timeline {
-        max-height: 50vh;
-    }
+.group-view-header {
+    padding: 12px 16px;
+}
 
-    #group-images {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 10px;
-        padding: 16px;
-    }
+.back-button {
+    font-size: 13px;
+    padding: 7px 14px;
+}
 
-    .group-view-header {
-        padding: 12px 16px;
-    }
-
-    .back-button {
-        font-size: 13px;
-        padding: 6px 14px;
-    }
-
-    .group-view-title {
-        font-size: 0.95rem;
-    }
+.group-view-title {
+    font-size: 0.95rem;
 }

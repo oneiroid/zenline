@@ -58,6 +58,18 @@ Single-page app using ES modules. Libraries loaded via CDN + importmap (D3 v7, T
 
 Files in `public/imgs/` must follow: `YYYY-MM-DD[-N].ext` (e.g., `2019-05-24.jpg`, `2019-05-24-1.jpg`). GLB files use the same base name as their paired image (e.g., `2019-10-06-5.glb` pairs with `2019-10-06-5.jpg`).
 
+## `mobile` branch (current)
+
+This branch is a mobile-first rewrite of the timeline UX. Desktop hover affordances are intentionally absent. Key differences from `main`:
+
+- **Vertical orientation**: timeline scrolls top-to-bottom (`overflow-y: auto`). Date maps to Y, force simulation balances X. `touch-action: pan-y` on the SVG so vertical scroll never fights gestures.
+- **No hover**: `mouseenter`/`mouseleave` and the on-hover preview card are gone. Tap feedback uses `touchstart`/`touchend` (`tapScale` in `timelineGroup.js`).
+- **Pulsation loop**: each `TimelineGroup` runs its own `requestAnimationFrame` pulse with random phase + period (`PULSE_PERIOD_MIN`..`MAX`, `PULSE_MIN`..`MAX` in `timelineGroup.js`). Amplitude is bounded so the maximum visible scale (focal × pulse) stays under the force-collision padding (`radius * 1.45` in `timeline.js`) — circles never overlap at peak.
+- **Pulse-synced grid morph**: at the peak of each pulse cycle the single thumbnail morphs into a 2×2 mini-grid (`GRID_DIM`); at the trough it collapses back into a fresh single image. Triggered by sine-wave thresholds (`wave > 0.85` / `< 0.15`) with a `gridShown` latch so each cycle does exactly one expand/collapse.
+- **Focal scroll-zoom**: `Timeline.attachScrollFocus` listens to container scroll and scales each group by distance from viewport center (1.18× at center, 0.82× at edges). Combined multiplicatively with `pulseScale` and `tapScale` in `applyTransform`.
+
+When editing this branch, do NOT reintroduce hover-driven behavior or horizontal-scroll assumptions. Do not merge from `main` without re-applying these decisions.
+
 ## Key details
 
 - Backend uses CommonJS (`require`); frontend uses ES modules (`import`)
