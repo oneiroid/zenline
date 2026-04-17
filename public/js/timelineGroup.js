@@ -29,7 +29,10 @@ import {
     TAP_SCALE,
     PALETTE,
 } from './constants.js';
+import { prefersReducedMotion, shuffle } from './utils.js';
 import { showGroupView } from './groupView.js';
+
+const GRID_CELLS = GRID_DIM * GRID_DIM;
 
 export class TimelineGroup {
     constructor(data, index, position, container) {
@@ -37,6 +40,7 @@ export class TimelineGroup {
         this.index = index;
         this.position = position;
         this.container = container;
+        this.reducedMotion = prefersReducedMotion();
         this.focalScale = 1;
         this.pulseScale = 1;
         this.tapScale = 1;
@@ -51,22 +55,31 @@ export class TimelineGroup {
     }
 
     initialize() {
+        const ariaLabel = `${this.formatDateRange()}, ${this.data.images.length} drawings`;
         this.group = this.container
             .append('g')
             .attr('class', 'timeline-group')
-            .attr('transform', `translate(${this.position.x},${this.position.y})`);
+            .attr('transform', `translate(${this.position.x},${this.position.y})`)
+            .attr('role', 'button')
+            .attr('tabindex', '0')
+            .attr('aria-label', ariaLabel);
 
-        this.scaleGroup = this.group.append('g')
-            .attr('transform', 'scale(0)')
-            .style('opacity', 0);
+        this.scaleGroup = this.group.append('g');
 
-        this.scaleGroup.transition()
-            .delay(this.index * ENTRANCE_STAGGER)
-            .duration(ENTRANCE_DURATION)
-            .ease(d3.easeBackOut.overshoot(ENTRANCE_OVERSHOOT))
-            .attr('transform', 'scale(1)')
-            .style('opacity', 1)
-            .on('end', () => this.startPulse());
+        if (this.reducedMotion) {
+            this.scaleGroup.attr('transform', 'scale(1)').style('opacity', 1);
+        } else {
+            this.scaleGroup
+                .attr('transform', 'scale(0)')
+                .style('opacity', 0)
+                .transition()
+                .delay(this.index * ENTRANCE_STAGGER)
+                .duration(ENTRANCE_DURATION)
+                .ease(d3.easeBackOut.overshoot(ENTRANCE_OVERSHOOT))
+                .attr('transform', 'scale(1)')
+                .style('opacity', 1)
+                .on('end', () => this.startPulse());
+        }
 
         this.boundaryCircle = this.scaleGroup.append('circle')
             .attr('r', this.position.radius)
@@ -79,7 +92,7 @@ export class TimelineGroup {
             .attr('class', 'timeline-group-label')
             .attr('y', this.position.radius + 20)
             .attr('text-anchor', 'middle')
-            .style('opacity', 0);
+            .style('opacity', this.reducedMotion ? 1 : 0);
 
         this.labelEl.append('tspan')
             .attr('x', 0)
@@ -92,10 +105,12 @@ export class TimelineGroup {
             .style('font-size', '10px')
             .text(`${this.data.images.length} drawings`);
 
-        this.labelEl.transition()
-            .delay(this.index * ENTRANCE_STAGGER + LABEL_ENTRANCE_DELAY)
-            .duration(LABEL_ENTRANCE_DURATION)
-            .style('opacity', 1);
+        if (!this.reducedMotion) {
+            this.labelEl.transition()
+                .delay(this.index * ENTRANCE_STAGGER + LABEL_ENTRANCE_DELAY)
+                .duration(LABEL_ENTRANCE_DURATION)
+                .style('opacity', 1);
+        }
 
         this.imageContainer = this.scaleGroup.append('g')
             .attr('class', 'thumbnail-container');
@@ -106,15 +121,20 @@ export class TimelineGroup {
             .append('circle')
             .attr('r', this.position.radius);
 
-        this.showSingleImage();
+        this.singleImage = this.createSingleImage(1);
 
-        // Touch-friendly tap with visual feedback (no hover)
         this.group
             .style('cursor', 'pointer')
-            .on('touchstart', () => { this.tapScale = TAP_SCALE; this.applyTransform(); }, { passive: true })
-            .on('touchend', () => { this.tapScale = 1; this.applyTransform(); }, { passive: true })
-            .on('touchcancel', () => { this.tapScale = 1; this.applyTransform(); }, { passive: true })
-            .on('click', () => this.onClick());
+            .on('touchstart', () => this.setTap(TAP_SCALE), { passive: true })
+            .on('touchend', () => this.setTap(1), { passive: true })
+            .on('touchcancel', () => this.setTap(1), { passive: true })
+            .on('click', () => this.onClick())
+            .on('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    this.onClick();
+                }
+            });
 
         // Random phase so groups don't pulse in sync
         this.pulsePeriod = PULSE_PERIOD_MIN + Math.random() * (PULSE_PERIOD_MAX - PULSE_PERIOD_MIN);
@@ -127,6 +147,9 @@ export class TimelineGroup {
         this.wobblePhaseRot = Math.random() * Math.PI * 2;
 
         this.startTime = performance.now();
+
+        // Entrance transition would normally kick off startPulse; in reduced-motion skip entrance and start now.
+        if (this.reducedMotion) this.startPulse();
     }
 
     formatDateRange() {
@@ -146,6 +169,11 @@ export class TimelineGroup {
         this.applyTransform();
     }
 
+    setTap(scale) {
+        this.tapScale = scale;
+        this.applyTransform();
+    }
+
     applyTransform() {
         const s = this.focalScale * this.pulseScale * this.tapScale;
         // translate then rotate then scale: wobble is in unscaled px relative to the group origin
@@ -156,6 +184,8 @@ export class TimelineGroup {
     }
 
     startPulse() {
+        if (this.reducedMotion) return;
+
         const TWO_PI = Math.PI * 2;
         const tick = (now) => {
             const elapsed = now - this.startTime;
@@ -181,7 +211,6 @@ export class TimelineGroup {
 
             this.applyTransform();
 
-            // At peak show mini-grid; at trough swap to a fresh single image
             if (wave > PULSE_PEAK_THRESHOLD && !this.gridShown) {
                 this.morphToGrid();
             } else if (wave < PULSE_TROUGH_THRESHOLD && this.gridShown) {
@@ -200,17 +229,17 @@ export class TimelineGroup {
         }
     }
 
-    showSingleImage() {
+    createSingleImage(opacity) {
         const img = this.getRandomImage();
         const r = this.position.radius;
-        this.singleImage = this.imageContainer.append('image')
+        return this.imageContainer.append('image')
             .attr('class', 'tg-single')
             .attr('x', -r).attr('y', -r)
             .attr('width', r * 2).attr('height', r * 2)
             .attr('clip-path', `url(#clip-${this.index})`)
             .attr('preserveAspectRatio', 'xMidYMid slice')
             .attr('xlink:href', `/imgs/${img.filename}`)
-            .style('opacity', 1);
+            .style('opacity', opacity);
     }
 
     morphToGrid() {
@@ -227,9 +256,8 @@ export class TimelineGroup {
             this.singleImage = null;
         }
 
-        const picks = this.getRandomPreviewImages(GRID_DIM * GRID_DIM);
-        this.gridImages = [];
-        picks.forEach((img, i) => {
+        const picks = this.getRandomPreviewImages(GRID_CELLS);
+        this.gridImages = picks.map((img, i) => {
             const row = Math.floor(i / GRID_DIM);
             const col = i % GRID_DIM;
             const x = -r + col * cellSize + inset;
@@ -252,13 +280,12 @@ export class TimelineGroup {
                 .attr('width', size).attr('height', size)
                 .style('opacity', 1);
 
-            this.gridImages.push(cell);
+            return cell;
         });
     }
 
     morphToSingle() {
         this.gridShown = false;
-        // Collapse grid cells to center then remove
         this.gridImages.forEach((cell, i) => {
             const cx = +cell.attr('x') + (+cell.attr('width')) / 2;
             const cy = +cell.attr('y') + (+cell.attr('height')) / 2;
@@ -273,17 +300,7 @@ export class TimelineGroup {
         });
         this.gridImages = [];
 
-        // Bring in a fresh single image fading up after grid collapses
-        const img = this.getRandomImage();
-        const r = this.position.radius;
-        this.singleImage = this.imageContainer.append('image')
-            .attr('class', 'tg-single')
-            .attr('x', -r).attr('y', -r)
-            .attr('width', r * 2).attr('height', r * 2)
-            .attr('clip-path', `url(#clip-${this.index})`)
-            .attr('preserveAspectRatio', 'xMidYMid slice')
-            .attr('xlink:href', `/imgs/${img.filename}`)
-            .style('opacity', 0);
+        this.singleImage = this.createSingleImage(0);
         this.singleImage.transition()
             .delay(MORPH_SINGLE_FADE_DELAY)
             .duration(MORPH_SINGLE_FADE_DURATION)
@@ -296,18 +313,12 @@ export class TimelineGroup {
     }
 
     getRandomPreviewImages(count) {
-        const images = [...this.data.images];
-        const result = [];
-        count = Math.min(count, images.length);
-        for (let i = 0; i < count; i++) {
-            const idx = Math.floor(Math.random() * images.length);
-            result.push(images.splice(idx, 1)[0]);
+        const pool = shuffle(this.data.images.slice());
+        const picks = pool.slice(0, Math.min(count, pool.length));
+        while (picks.length < count) {
+            picks.push(pool[picks.length % pool.length]);
         }
-        // If fewer images than cells, repeat
-        while (result.length < GRID_DIM * GRID_DIM) {
-            result.push(this.data.images[Math.floor(Math.random() * this.data.images.length)]);
-        }
-        return result;
+        return picks;
     }
 
     onClick() {

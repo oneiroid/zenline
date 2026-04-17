@@ -85,9 +85,7 @@ export const AXIS_LABEL_X_OFFSET = -8;
 export const PALETTE = {
     bg: '#fdf8f3',
     circle_stroke: '#d4c4b0',
-    circle_stroke_hover: '#b8a99a',
     label: '#b8a99a',
-    label_hover: '#6b5e50',
     lifeline: '#d4c4b0',
     lifeline_start: '#e8d5c4',
     lifeline_end: '#c4b0a0',
