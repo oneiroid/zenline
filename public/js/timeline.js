@@ -24,12 +24,14 @@ import {
     AXIS_FOCAL_RANGE,
     AXIS_LINE_OPACITY_MIN,
 } from './constants.js';
-import { debounce } from './utils.js';
+import { debounce, prefersReducedMotion } from './utils.js';
 import { TimelineGroup } from './timelineGroup.js';
 
 export class Timeline {
     constructor(containerId) {
         this.containerId = containerId;
+        this.container = document.getElementById(containerId);
+        this.status = document.getElementById('timeline-status');
         this.groups = [];
         this.initialize();
     }
@@ -37,11 +39,27 @@ export class Timeline {
     async initialize() {
         try {
             await this.fetchImageGroups();
+            if (!this.imageGroups.length) {
+                this.showStatus('No drawings yet', true);
+                return;
+            }
             this.render();
             this.setupEventListeners();
         } catch (error) {
             console.error('Failed to initialize timeline:', error);
+            this.showStatus('Could not load gallery', true);
         }
+    }
+
+    showStatus(text, isError) {
+        if (!this.status) return;
+        this.status.classList.toggle('timeline-status--error', !!isError);
+        this.status.querySelector('span:last-child').textContent = text;
+        this.status.style.display = '';
+    }
+
+    hideStatus() {
+        if (this.status) this.status.style.display = 'none';
     }
 
     async fetchImageGroups() {
@@ -65,15 +83,14 @@ export class Timeline {
 
     createTimelineSVG() {
         const margin = TIMELINE_MARGIN;
-        const container = document.getElementById(this.containerId);
-        const viewportHeight = container.clientHeight;
-        const viewportWidth = container.clientWidth;
+        const viewportHeight = this.container.clientHeight;
+        const viewportWidth = this.container.clientWidth;
 
         const minHeight = Math.max(viewportHeight, this.imageGroups.length * MIN_GROUP_SPACING);
         const height = minHeight - margin.top - margin.bottom;
         const width = viewportWidth - margin.left - margin.right;
 
-        d3.select(`#${this.containerId}`).html('');
+        d3.select(`#${this.containerId}`).selectAll('svg').remove();
 
         const svgRoot = d3.select(`#${this.containerId}`)
             .append('svg')
@@ -126,13 +143,16 @@ export class Timeline {
             .tickFormat(d3.timeFormat('%Y'))
             .tickSize(-width);
 
-        svg.append('g')
+        const axisG = svg.append('g')
             .attr('class', 'time-axis')
             .attr('transform', `translate(${width / 2},0)`)
-            .call(timeAxis)
-            .selectAll('text')
+            .call(timeAxis);
+
+        axisG.selectAll('text')
             .attr('x', AXIS_LABEL_X_OFFSET)
             .style('text-anchor', 'end');
+
+        return axisG;
     }
 
     addLifeline(svg, positions) {
@@ -147,6 +167,8 @@ export class Timeline {
             .attr('class', 'timeline-lifeline')
             .attr('d', lineGen(positions));
 
+        if (prefersReducedMotion()) return;
+
         const totalLength = path.node().getTotalLength();
         path
             .attr('stroke-dasharray', totalLength)
@@ -157,18 +179,12 @@ export class Timeline {
             .attr('stroke-dashoffset', 0);
     }
 
-    calculateGroupPositions(yScale, sizeScale, width, height) {
+    calculateGroupPositions(yScale, sizeScale, width) {
         const centerX = width / 2;
         const nodes = this.imageGroups.map((group, index) => {
+            const y = yScale(new Date(group.centerDate));
             const radius = sizeScale(group.size);
-            return {
-                index,
-                x: centerX,
-                y: yScale(new Date(group.centerDate)),
-                fy: yScale(new Date(group.centerDate)),
-                radius,
-                group
-            };
+            return { index, x: centerX, y, fy: y, radius, group };
         });
 
         const simulation = d3.forceSimulation(nodes)
@@ -184,10 +200,8 @@ export class Timeline {
                 x: Math.max(node.radius + SIDE_PADDING, Math.min(width - node.radius - SIDE_PADDING, node.x)),
                 y: node.y,
                 radius: node.radius,
-                areaHeight: height
             };
         });
-
         return positions;
     }
 
@@ -195,19 +209,27 @@ export class Timeline {
         this.cleanup();
 
         const config = this.createTimelineSVG();
-        const { svg, width, height } = config;
+        const { svg, margin, width, height } = config;
         const { yScale, sizeScale } = this.createScales(width, height);
 
-        const positions = this.calculateGroupPositions(yScale, sizeScale, width, height);
+        const positions = this.calculateGroupPositions(yScale, sizeScale, width);
 
-        this.addTimeAxis(svg, yScale, width);
+        const axisG = this.addTimeAxis(svg, yScale, width);
         this.addLifeline(svg, positions);
 
+        this.marginTop = margin.top;
         this.groups = this.imageGroups.map((data, index) =>
             new TimelineGroup(data, index, positions[index], svg)
         );
 
-        this.axisTicks = svg.selectAll('.time-axis .tick');
+        this.tickInfo = axisG.selectAll('.tick').nodes().map(node => ({
+            node,
+            text: node.querySelector('text'),
+            line: node.querySelector('line'),
+            y: parseTickY(node),
+        }));
+
+        this.hideStatus();
         this.attachScrollFocus();
     }
 
@@ -215,46 +237,38 @@ export class Timeline {
         this.groups.forEach(group => group.destroy());
         this.groups = [];
         if (this.scrollHandler) {
-            const container = document.getElementById(this.containerId);
-            container.removeEventListener('scroll', this.scrollHandler);
+            this.container.removeEventListener('scroll', this.scrollHandler);
             this.scrollHandler = null;
         }
     }
 
     attachScrollFocus() {
-        const container = document.getElementById(this.containerId);
         const update = () => {
-            const rect = container.getBoundingClientRect();
-            const focalY = rect.top + rect.height / 2;
-            const falloff = rect.height * FOCAL_FALLOFF_FRACTION;
+            const viewportHeight = this.container.clientHeight;
+            const scrollTop = this.container.scrollTop;
+            const focalY = scrollTop + viewportHeight / 2;
+            const falloff = viewportHeight * FOCAL_FALLOFF_FRACTION;
 
+            // Group focal: distance from viewport center in svg-space (no layout reads).
             this.groups.forEach(g => {
-                const node = g.group.node();
-                if (!node) return;
-                const gRect = node.getBoundingClientRect();
-                const cy = gRect.top + gRect.height / 2;
-                const dist = Math.abs(cy - focalY);
-                const t = Math.min(1, dist / falloff);
-                const focal = FOCAL_MAX - FOCAL_RANGE * t;
-                g.setFocalScale(focal);
+                const groupY = this.marginTop + g.position.y;
+                const t = Math.min(1, Math.abs(groupY - focalY) / falloff);
+                g.setFocalScale(FOCAL_MAX - FOCAL_RANGE * t);
             });
 
-            // Axis ticks: scale labels and modulate grid-line opacity by focal distance
-            if (this.axisTicks) {
-                this.axisTicks.each(function () {
-                    const tickNode = this;
-                    const tRect = tickNode.getBoundingClientRect();
-                    const cy = tRect.top + tRect.height / 2;
-                    const dist = Math.abs(cy - focalY);
-                    const k = Math.min(1, dist / falloff);
+            // Axis tick focal: same distance model applied to pre-parsed tick Y positions.
+            if (this.tickInfo) {
+                for (const tick of this.tickInfo) {
+                    const tickY = this.marginTop + tick.y;
+                    const k = Math.min(1, Math.abs(tickY - focalY) / falloff);
                     const scale = AXIS_FOCAL_MAX - AXIS_FOCAL_RANGE * k;
                     const lineOpacity = AXIS_LINE_OPACITY_MIN + (1 - AXIS_LINE_OPACITY_MIN) * (1 - k);
-                    const sel = d3.select(tickNode);
-                    sel.select('text').attr('transform', `scale(${scale})`);
-                    sel.select('line').style('opacity', lineOpacity);
-                });
+                    if (tick.text) tick.text.setAttribute('transform', `scale(${scale})`);
+                    if (tick.line) tick.line.style.opacity = lineOpacity;
+                }
             }
         };
+
         let raf = null;
         this.scrollHandler = () => {
             if (raf) return;
@@ -263,7 +277,7 @@ export class Timeline {
                 update();
             });
         };
-        container.addEventListener('scroll', this.scrollHandler, { passive: true });
+        this.container.addEventListener('scroll', this.scrollHandler, { passive: true });
         setTimeout(update, SCROLL_FOCUS_INIT_DELAY);
     }
 
@@ -272,4 +286,10 @@ export class Timeline {
         window.addEventListener('resize', debouncedRender);
         window.addEventListener('orientationchange', debouncedRender);
     }
+}
+
+// d3 sets "translate(0,Y)" on tick groups; parse once so we can reuse Y during scroll.
+function parseTickY(tickNode) {
+    const m = /translate\(\s*[-\d.]+\s*,\s*([-\d.]+)\s*\)/.exec(tickNode.getAttribute('transform') || '');
+    return m ? parseFloat(m[1]) : 0;
 }

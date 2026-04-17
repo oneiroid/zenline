@@ -24,11 +24,16 @@
     <div class="container">
         <div id="timeline-view" class="view active">
             <h1>Zen Timeline<span class="subtitle">a journey through art</span></h1>
-            <div id="timeline"></div>
+            <div id="timeline">
+                <div class="timeline-status" id="timeline-status" role="status" aria-live="polite">
+                    <span class="timeline-status__dot"></span>
+                    <span>Loading gallery</span>
+                </div>
+            </div>
         </div>
-        <div id="group-view" class="view">
+        <div id="group-view" class="view" aria-hidden="true">
             <div class="group-view-header">
-                <button id="back-to-timeline" class="back-button">&larr; Timeline</button>
+                <button id="back-to-timeline" class="back-button" aria-label="Back to timeline">&larr; Timeline</button>
                 <span id="group-view-title" class="group-view-title"></span>
                 <span id="group-view-count" class="group-view-count"></span>
             </div>
