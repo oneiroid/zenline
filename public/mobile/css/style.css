@@ -8,8 +8,8 @@
 
 body {
     font-family: 'Nunito', sans-serif;
-    background-color: #fdf8f3;
-    color: #3d3429;
+    background-color: #fdf4e8;
+    color: #3d2416;
     overflow: hidden;
 }
 
@@ -52,11 +52,11 @@ body {
 
 #timeline-view h1 {
     text-align: center;
-    padding: 14px 16px 4px;
+    padding: 8px 16px 2px;
     font-weight: 300;
     font-size: 1.3rem;
     letter-spacing: 0.15em;
-    color: #6b5e50;
+    color: #5a2d16;
     text-transform: uppercase;
 }
 
@@ -64,9 +64,9 @@ body {
     display: block;
     font-size: 0.55rem;
     letter-spacing: 0.3em;
-    color: #b8a99a;
+    color: #c97a3e;
     margin-top: 2px;
-    font-weight: 400;
+    font-weight: 600;
 }
 
 #timeline {
@@ -100,38 +100,52 @@ body {
 }
 
 .timeline-group-background {
-    filter: drop-shadow(0 3px 10px rgba(107, 94, 80, 0.18));
+    filter: drop-shadow(0 3px 12px rgba(216, 96, 50, 0.22));
 }
 
 .timeline-group-label {
     font-family: 'Nunito', sans-serif;
     font-size: 11px;
     font-weight: 600;
-    fill: #b8a99a;
+    fill: #a8754c;
     pointer-events: none;
+}
+
+/* Thumbnail preloader shimmer (pulsing dot behind image) */
+.tg-preloader {
+    fill: #f4b860;
+    transform-origin: center;
+    transform-box: fill-box;
+    animation: thumbnailShimmer 1.3s ease-in-out infinite;
+    pointer-events: none;
+}
+
+@keyframes thumbnailShimmer {
+    0%, 100% { opacity: 0.3; transform: scale(0.75); }
+    50%      { opacity: 0.85; transform: scale(1.1); }
 }
 
 /* Timeline lifeline path */
 .timeline-lifeline {
     fill: none;
     stroke: url(#lifeline-gradient);
-    stroke-width: 2;
+    stroke-width: 2.5;
     stroke-linecap: round;
-    opacity: 0.4;
+    opacity: 0.55;
 }
 
 /* Time axis */
 .time-axis path,
 .time-axis line {
-    stroke: #d4c4b0;
+    stroke: #e0b090;
     stroke-width: 1px;
 }
 
 .time-axis text {
     font-family: 'Nunito', sans-serif;
     font-size: 10px;
-    fill: #b8a99a;
-    font-weight: 600;
+    fill: #a8754c;
+    font-weight: 700;
 }
 
 /* ── Preview Grid ─────────────────────── */
@@ -375,12 +389,12 @@ body {
 }
 
 .timeline-group:focus-visible .timeline-group-background {
-    stroke: #6b5e50;
+    stroke: #c94d2c;
     stroke-width: 3.5px;
 }
 
 .back-button:focus-visible {
-    outline: 2px solid #6b5e50;
+    outline: 2px solid #c94d2c;
     outline-offset: 2px;
 }
 
