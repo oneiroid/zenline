@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zen Timeline</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/css/lightbox.min.css">
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lightbox2/2.11.3/js/lightbox.min.js"></script>
+    <script type="importmap">
+        {
+          "imports": {
+            "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+            "three/addons/controls/OrbitControls.js": "https://unpkg.com/three@0.128.0/examples/jsm/controls/OrbitControls.js",
+            "three/addons/loaders/GLTFLoader.js": "https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js",
+            "moment": "https://cdn.jsdelivr.net/npm/moment@2.29.4/dist/moment.min.js"
+          }
+        }
+    </script>
+</head>
+<body>
+    <div class="container">
+        <div id="timeline-view" class="view active">
+            <h1>Zen Timeline<span class="subtitle">a journey through art</span></h1>
+            <div id="timeline"></div>
+        </div>
+        <div id="group-view" class="view">
+            <div class="group-view-header">
+                <button id="back-to-timeline" class="back-button">&larr; Timeline</button>
+                <span id="group-view-title" class="group-view-title"></span>
+                <span id="group-view-count" class="group-view-count"></span>
+            </div>
+            <div id="group-images"></div>
+        </div>
+    </div>
+    <script type="module" src="/js/main.js"></script>
+</body>
+</html>

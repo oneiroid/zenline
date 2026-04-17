@@ -5,8 +5,9 @@ const { scanImages, serializeGroups } = require('./lib/grouping');
 
 const app = express();
 const port = 3000;
-const imgDir = path.join(__dirname, 'public', 'imgs');
-const outputPath = path.join(__dirname, 'public', 'data', 'images.json');
+const publicDir = path.join(__dirname, 'public');
+const imgDir = path.join(publicDir, 'imgs');
+const outputPath = path.join(publicDir, 'data', 'images.json');
 
 // Auto-regenerate static JSON on startup so dev always has fresh data
 try {
@@ -17,8 +18,13 @@ try {
     console.error('Warning: could not regenerate images.json:', error.message);
 }
 
-// Serve static files
-app.use(express.static('public'));
+// Serves the whole public tree:
+//   /                -> public/index.html (device router)
+//   /desktop/        -> public/desktop/index.html
+//   /mobile/         -> public/mobile/index.html
+//   /imgs/, /data/   -> shared assets used by both variants (absolute paths
+//                       in the unbundled JS resolve here)
+app.use(express.static(publicDir));
 
 app.listen(port, () => {
     console.log(`Gallery app listening at http://localhost:${port}`);
