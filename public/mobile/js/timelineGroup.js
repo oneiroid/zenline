@@ -24,10 +24,9 @@ import {
     MORPH_IN_DURATION,
     MORPH_CELL_STAGGER_OUT,
     MORPH_CELL_STAGGER_IN,
-    MORPH_SINGLE_FADE_DELAY,
-    MORPH_SINGLE_FADE_DURATION,
     TAP_SCALE,
     PALETTE,
+    PRELOADER_FADE_MS,
 } from './constants.js';
 import { prefersReducedMotion, shuffle } from './utils.js';
 import { showGroupView } from './groupView.js';
@@ -120,6 +119,14 @@ export class TimelineGroup {
             .attr('id', `clip-${this.index}`)
             .append('circle')
             .attr('r', this.position.radius);
+
+        // Preloader: soft pulsing dot shown until a thumbnail is loaded and faded in.
+        // Kept in imageContainer (beneath images) so clipPath doesn't clip it oddly.
+        this.preloader = this.imageContainer.append('circle')
+            .attr('class', 'tg-preloader')
+            .attr('r', Math.max(8, this.position.radius * 0.28))
+            .attr('cx', 0).attr('cy', 0);
+        this.pendingLoads = 0;
 
         this.singleImage = this.createSingleImage(1);
 
@@ -232,14 +239,50 @@ export class TimelineGroup {
     createSingleImage(opacity) {
         const img = this.getRandomImage();
         const r = this.position.radius;
-        return this.imageContainer.append('image')
+        const sel = this.imageContainer.append('image')
             .attr('class', 'tg-single')
             .attr('x', -r).attr('y', -r)
             .attr('width', r * 2).attr('height', r * 2)
             .attr('clip-path', `url(#clip-${this.index})`)
             .attr('preserveAspectRatio', 'xMidYMid slice')
             .attr('xlink:href', `/imgs/${img.filename}`)
-            .style('opacity', opacity);
+            .style('opacity', 0);
+        this.trackLoad(sel, opacity);
+        return sel;
+    }
+
+    trackLoad(sel, targetOpacity) {
+        this.pendingLoads += 1;
+        this.updatePreloader();
+
+        let fired = false;
+        const done = () => {
+            if (fired) return;
+            fired = true;
+            // Named transition ('fadein') so it does not clobber the
+            // unnamed geometry transition used by morphToGrid (width/height grow).
+            sel.transition('fadein').duration(PRELOADER_FADE_MS).ease(d3.easeCubicOut)
+                .style('opacity', targetOpacity);
+            this.pendingLoads = Math.max(0, this.pendingLoads - 1);
+            this.updatePreloader();
+        };
+
+        // SVGImageElement's 'load' event is not reliably fired in all browsers,
+        // so drive the detection off a regular HTMLImageElement preloading the same URL —
+        // the SVG <image> reuses the cached resource once the decode completes.
+        const href = sel.attr('href') || sel.attr('xlink:href');
+        const probe = new Image();
+        probe.onload = done;
+        probe.onerror = done;
+        probe.src = href;
+
+        // Safety net: if both events fail to fire (very rare), unblock the UI.
+        setTimeout(done, 3000);
+    }
+
+    updatePreloader() {
+        if (!this.preloader) return;
+        this.preloader.style('display', this.pendingLoads > 0 ? null : 'none');
     }
 
     morphToGrid() {
@@ -277,9 +320,9 @@ export class TimelineGroup {
                 .duration(MORPH_OUT_DURATION)
                 .ease(d3.easeCubicOut)
                 .attr('x', x).attr('y', y)
-                .attr('width', size).attr('height', size)
-                .style('opacity', 1);
+                .attr('width', size).attr('height', size);
 
+            this.trackLoad(cell, 1);
             return cell;
         });
     }
@@ -300,12 +343,7 @@ export class TimelineGroup {
         });
         this.gridImages = [];
 
-        this.singleImage = this.createSingleImage(0);
-        this.singleImage.transition()
-            .delay(MORPH_SINGLE_FADE_DELAY)
-            .duration(MORPH_SINGLE_FADE_DURATION)
-            .ease(d3.easeCubicOut)
-            .style('opacity', 1);
+        this.singleImage = this.createSingleImage(1);
     }
 
     getRandomImage() {

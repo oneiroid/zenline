@@ -1,10 +1,10 @@
 // ── Layout ────────────────────────────────────────────────
-export const TIMELINE_MARGIN = { top: 30, right: 20, bottom: 30, left: 20 };
-export const MIN_GROUP_SPACING = 200;        // px of vertical content per group (min)
+export const TIMELINE_MARGIN = { top: 16, right: 18, bottom: 18, left: 18 };
+export const MIN_GROUP_SPACING = 150;        // px of vertical content per group (min)
 export const RADIUS_MIN = 26;
 export const RADIUS_MAX_ABS = 94;             // hard ceiling for circle radius
 export const RADIUS_MAX_WIDTH_FRACTION = 0.22; // also limited by viewport width
-export const DOMAIN_PADDING_FRACTION = 0.04;   // extra time-domain padding above/below
+export const DOMAIN_PADDING_FRACTION = 0.02;   // extra time-domain padding above/below
 export const SIDE_PADDING = 8;                 // px from svg edge to circle edge
 
 // ── Force simulation ──────────────────────────────────────
@@ -83,10 +83,14 @@ export const AXIS_LABEL_X_OFFSET = -8;
 
 // ── Palette ───────────────────────────────────────────────
 export const PALETTE = {
-    bg: '#fdf8f3',
-    circle_stroke: '#d4c4b0',
-    label: '#b8a99a',
-    lifeline: '#d4c4b0',
-    lifeline_start: '#e8d5c4',
-    lifeline_end: '#c4b0a0',
+    bg: '#fdf4e8',
+    circle_stroke: '#e08a5a',
+    label: '#a8754c',
+    lifeline: '#e08a5a',
+    lifeline_start: '#f4b860',
+    lifeline_end: '#d4604a',
+    preloader: '#f4b860',
 };
+
+// ── Preloader (thumbnail loading shimmer) ────────────────
+export const PRELOADER_FADE_MS = 320;
