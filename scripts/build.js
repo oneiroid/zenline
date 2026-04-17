@@ -6,6 +6,7 @@ const { scanImages, serializeGroups } = require('../lib/grouping');
 const ROOT = path.resolve(__dirname, '..');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const DIST_DIR = path.join(ROOT, 'dist');
+const VARIANTS = ['desktop', 'mobile'];
 
 function rimraf(dir) {
     if (fs.existsSync(dir)) {
@@ -35,15 +36,15 @@ async function regenerateImagesJson() {
     console.log(`[build] regenerated images.json (${groups.length} groups)`);
 }
 
-async function bundleJS() {
+async function bundleVariantJS(variant) {
     await esbuild.build({
-        entryPoints: [path.join(PUBLIC_DIR, 'js', 'main.js')],
+        entryPoints: [path.join(PUBLIC_DIR, variant, 'js', 'main.js')],
         bundle: true,
         minify: true,
         sourcemap: true,
         format: 'esm',
         target: ['es2018', 'chrome70', 'safari12', 'firefox68'],
-        outfile: path.join(DIST_DIR, 'js', 'main.min.js'),
+        outfile: path.join(DIST_DIR, variant, 'js', 'main.min.js'),
         external: [
             'three',
             'three/addons/controls/OrbitControls.js',
@@ -55,38 +56,52 @@ async function bundleJS() {
     });
 }
 
-async function bundleCSS() {
+async function bundleVariantCSS(variant) {
     await esbuild.build({
-        entryPoints: [path.join(PUBLIC_DIR, 'css', 'style.css')],
+        entryPoints: [path.join(PUBLIC_DIR, variant, 'css', 'style.css')],
         bundle: true,
         minify: true,
-        outfile: path.join(DIST_DIR, 'css', 'style.min.css'),
+        outfile: path.join(DIST_DIR, variant, 'css', 'style.min.css'),
         loader: { '.css': 'css' },
         legalComments: 'none',
         logLevel: 'info',
     });
 }
 
-function copyStatic() {
+function copySharedStatic() {
     copyDir(path.join(PUBLIC_DIR, 'imgs'), path.join(DIST_DIR, 'imgs'));
     copyDir(path.join(PUBLIC_DIR, 'data'), path.join(DIST_DIR, 'data'));
 }
 
-function writeIndexHtml() {
-    const src = fs.readFileSync(path.join(PUBLIC_DIR, 'index.html'), 'utf8');
+function writeVariantIndexHtml(variant) {
+    const src = fs.readFileSync(path.join(PUBLIC_DIR, variant, 'index.html'), 'utf8');
+    // Variant HTML lives at dist/{variant}/index.html
+    // - css/js sit next to it under {variant}/css and {variant}/js -> use relative paths
     const rewritten = src
         .replace('/css/style.css', 'css/style.min.css')
         .replace('/js/main.js', 'js/main.min.js');
-    fs.writeFileSync(path.join(DIST_DIR, 'index.html'), rewritten);
+    fs.writeFileSync(path.join(DIST_DIR, variant, 'index.html'), rewritten);
 }
 
-function rewriteBundlePaths() {
-    const jsFile = path.join(DIST_DIR, 'js', 'main.min.js');
+function rewriteVariantBundlePaths(variant) {
+    // Variant HTML is at /{variant}/, shared assets at /imgs/ and /data/.
+    // Rewrite absolute "/imgs/" and "/data/" references in bundled JS to
+    // "../imgs/" and "../data/" so they resolve against the shared root
+    // regardless of deployment subpath.
+    const jsFile = path.join(DIST_DIR, variant, 'js', 'main.min.js');
     const src = fs.readFileSync(jsFile, 'utf8');
     const rewritten = src
-        .replace(/(["'`])\/imgs\//g, '$1imgs/')
-        .replace(/(["'`])\/data\//g, '$1data/');
+        .replace(/(["'`])\/imgs\//g, '$1../imgs/')
+        .replace(/(["'`])\/data\//g, '$1../data/');
     fs.writeFileSync(jsFile, rewritten);
+}
+
+function writeRouterIndexHtml() {
+    // The router in public/index.html is self-contained; copy verbatim.
+    fs.copyFileSync(
+        path.join(PUBLIC_DIR, 'index.html'),
+        path.join(DIST_DIR, 'index.html')
+    );
 }
 
 (async () => {
@@ -94,10 +109,17 @@ function rewriteBundlePaths() {
     rimraf(DIST_DIR);
     fs.mkdirSync(DIST_DIR, { recursive: true });
     await regenerateImagesJson();
-    await Promise.all([bundleJS(), bundleCSS()]);
-    copyStatic();
-    rewriteBundlePaths();
-    writeIndexHtml();
+    const tasks = [];
+    for (const variant of VARIANTS) {
+        tasks.push(bundleVariantJS(variant), bundleVariantCSS(variant));
+    }
+    await Promise.all(tasks);
+    copySharedStatic();
+    for (const variant of VARIANTS) {
+        rewriteVariantBundlePaths(variant);
+        writeVariantIndexHtml(variant);
+    }
+    writeRouterIndexHtml();
     console.log(`[build] done in ${Date.now() - t0}ms -> ${path.relative(ROOT, DIST_DIR)}`);
 })().catch((err) => {
     console.error(err);
