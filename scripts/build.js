@@ -75,11 +75,13 @@ function copySharedStatic() {
 
 function writeVariantIndexHtml(variant) {
     const src = fs.readFileSync(path.join(PUBLIC_DIR, variant, 'index.html'), 'utf8');
-    // Variant HTML lives at dist/{variant}/index.html
-    // - css/js sit next to it under {variant}/css and {variant}/js -> use relative paths
+    // Variant HTML lives at dist/{variant}/index.html with css/js next to it.
+    // Source HTML uses relative paths (css/style.css, js/main.js) so the dev
+    // server works without rewriting. For dist, point them at the minified bundles.
+    // Regex tolerates a leading slash too, in case source ever reverts to absolute.
     const rewritten = src
-        .replace('/css/style.css', 'css/style.min.css')
-        .replace('/js/main.js', 'js/main.min.js');
+        .replace(/\/?css\/style\.css/, 'css/style.min.css')
+        .replace(/\/?js\/main\.js/, 'js/main.min.js');
     fs.writeFileSync(path.join(DIST_DIR, variant, 'index.html'), rewritten);
 }
 
