@@ -55,15 +55,8 @@ export const WOBBLE_RADIUS_BUFFER = (WOBBLE_AMPLITUDE_PX * 2) / RADIUS_MIN;
 export const COLLISION_PADDING =
     (PULSE_MAX * FOCAL_MAX + WOBBLE_RADIUS_BUFFER) * COLLISION_SAFETY;
 
-// ── Grid morph ────────────────────────────────────────────
-export const GRID_DIM = 2;                     // NxN mini-grid at peak
-export const GRID_CELL_INSET = 1;              // px gap between cells
-export const MORPH_OUT_DURATION = 420;         // single → grid expand
-export const MORPH_IN_DURATION = 360;          // grid → single collapse
-export const MORPH_CELL_STAGGER_OUT = 50;
-export const MORPH_CELL_STAGGER_IN = 30;
-export const MORPH_SINGLE_FADE_DELAY = 150;
-export const MORPH_SINGLE_FADE_DURATION = 500;
+// ── Thumbnail crossfade (swap at pulse peak) ──────────────
+export const CROSSFADE_DURATION = 520;
 
 // ── Entrance ──────────────────────────────────────────────
 export const ENTRANCE_STAGGER = 60;

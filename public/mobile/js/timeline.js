@@ -231,9 +231,28 @@ export class Timeline {
 
         this.hideStatus();
         this.attachScrollFocus();
+        this.startTickLoop();
+    }
+
+    startTickLoop() {
+        // One rAF drives pulse/wobble/boundary for every group. Previously each
+        // TimelineGroup scheduled its own rAF (27 callbacks/frame); folding them
+        // into a single loop cuts scheduler overhead and keeps writes batched.
+        this.tickLoopStopped = false;
+        const tick = (now) => {
+            if (this.tickLoopStopped) return;
+            for (const g of this.groups) g.tick(now);
+            this.tickRaf = requestAnimationFrame(tick);
+        };
+        this.tickRaf = requestAnimationFrame(tick);
     }
 
     cleanup() {
+        this.tickLoopStopped = true;
+        if (this.tickRaf) {
+            cancelAnimationFrame(this.tickRaf);
+            this.tickRaf = null;
+        }
         this.groups.forEach(group => group.destroy());
         this.groups = [];
         if (this.scrollHandler) {
